@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "defaultMode": "default",
+    "deny": [
+      "Read(.env)",
+      "Read(**/.env)",
+      "Read(**/*.pem)",
+      "Read(**/id_rsa*)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean -fd *)"
+    ],
+    "ask": [
+      "WebFetch",
+      "Bash(git push *)",
+      "Bash(git tag *)",
+      "Bash(rm -rf *)",
+      "Bash(sudo *)",
+      "Bash(npm publish *)",
+      "Edit(/.github/workflows/**)"
+    ],
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(rg *)"
+    ]
+  }
+}
