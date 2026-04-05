@@ -1,0 +1,6 @@
+agent:
+  name: panbk-agent
+  version: 0.1.0
+settings:
+  environment: dev
+  log_level: info
