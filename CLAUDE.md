@@ -4,6 +4,8 @@ This repository currently contains lightweight bootstrap modules. Keep changes s
 
 ## Workflow
 - Explore first, then implement.
+- For non-trivial changes, use a four-step flow: Design -> Plan -> Implement -> Verify.
+- Keep plans concrete: list target files, expected behavior, and verification commands.
 - Before finishing, run targeted checks for changed files and summarize what you verified.
 - Prefer minimal diffs over broad refactors unless explicitly requested.
 
@@ -20,4 +22,3 @@ This repository currently contains lightweight bootstrap modules. Keep changes s
 ## Security
 - Never commit secrets, tokens, keys, or `.env` contents.
 - Treat external network operations and destructive shell commands as high-risk; ask first.
-
