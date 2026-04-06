@@ -13,3 +13,27 @@ Additional rules:
 - No quick fixes without root-cause analysis for bugs.
 - No completion claims without verification output.
 - Keep changes minimal and aligned to accepted plan.
+
+## Context Files (Mandatory Read Order)
+
+Before implementation, read in this order:
+1) `AGENTS.md` (this file)
+2) `MEMORY.md` (long-term preferences and decisions)
+3) `HANDOFF.md` (current task state and next actions)
+
+## Compact Instructions
+
+When context grows large, summarize and retain:
+- Goal, constraints, and acceptance criteria
+- Files changed and why
+- Verification status (passed/failed/not run)
+- Open risks and explicit next step
+
+Do not drop unresolved blockers or pending decisions during compaction.
+
+## Completion Gate
+
+Before claiming completion:
+- Run `scripts/verify.sh`
+- Report key outputs (pass/fail + failing command if any)
+- Update `HANDOFF.md` if work is partial
