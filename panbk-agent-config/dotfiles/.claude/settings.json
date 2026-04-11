@@ -1,6 +1,18 @@
 {
+  "includeCoAuthoredBy": false,
+  "model": "claude-sonnet-4-6",
+  "extraKnownMarketplaces": {
+    "openai-codex": {
+      "source": {
+        "source": "github",
+        "repo": "openai/codex-plugin-cc"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "codex@openai-codex": true
+  },
   "permissions": {
-    "defaultMode": "default",
     "deny": [
       "Read(.env)",
       "Read(**/.env)",
@@ -20,8 +32,8 @@
       "Bash(git tag *)",
       "Bash(rm -rf *)",
       "Bash(sudo *)",
-      "Bash(pip install *)",
       "Bash(npm publish *)",
+      "Bash(pip install *)",
       "Bash(brew install *)",
       "Bash(npm install *)",
       "Edit(**/.github/workflows/**)"
@@ -32,7 +44,6 @@
       "Bash(git diff *)",
       "Bash(git log *)",
       "Bash(ls *)",
-      "Bash(cat *)",
       "Bash(rg *)",
       "Bash(fd *)",
       "Bash(mise *)",
