@@ -1,10 +1,6 @@
-# Claude Code Instructions
+# Codex Agent Instructions
 
-These instructions summarize the current fused agent configuration as a reusable `CLAUDE.md` baseline.
-
-## Language
-
-- 默认用中文回答，除非用户用其他语言提问。
+These instructions summarize the current Codex working configuration. They are intended as a reusable `AGENTS.md` baseline.
 
 ## Default Workflow
 
@@ -73,32 +69,15 @@ For feature work, bugfixes, and refactors:
 - Do not call tests passing if any tests were skipped or only partially run.
 - When context gets long or the state is hard to summarize, stop and restate what is known before continuing.
 
-## Claude Code Workflow
-
-- For non-trivial tasks, follow: Explore -> Plan (`/plan`) -> Implement -> Verify.
-- Use `/compact` when the conversation grows long; retain: goal, changed files, verification status, open risks.
-- Prefer sub-agents (`/agents`) for parallel exploration tasks or when strict context isolation is needed.
-- Check `/context` before upgrading effort or model; compacting or splitting is often more effective.
-- Default effort: medium. Escalate to high only for complex design or hard debugging.
-
 ## Safety
 
 - Confirm before destructive operations such as `rm -rf`, `git reset --hard`, force pushes, `sudo`, database drops, or production-impacting commands.
 - Never commit secrets, tokens, API keys, or `.env` contents.
 - Treat user configuration files as sensitive local state; preserve unrelated content.
 
-## Git Conventions
-
-- Use conventional commit prefixes: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`.
-- Keep one logical change per commit when possible.
-- Do not rewrite history unless explicitly requested.
-
 ## Tooling Preferences
 
-- Version management: mise.
-- Environment variables: direnv.
 - Prefer `rg` and `fd` for search.
-- Prefer dedicated Claude Code tools (`Read`, `Edit`, `Grep`, `Glob`) over equivalent shell commands when available.
 - Prefer existing project patterns and local helper APIs over new abstractions.
 - Use structured parsers or APIs instead of ad hoc string manipulation when practical.
 - Keep verification evidence tied to the actual command output used.
