@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="820" viewBox="0 0 1200 820" role="img" aria-labelledby="title desc">
+  <title id="title">直连、普通代理和链式代理路径对比</title>
+  <desc id="desc">展示直连、普通代理、链式代理三种网络访问路径。</desc>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #fbfaf7;
+      --ink: #222;
+      --muted: #68707d;
+      --line: #2f3542;
+      --direct: #e8eef4;
+      --proxy: #dff4df;
+      --chain: #fff0bf;
+      --node: #d8ecff;
+      --site: #ffe0dc;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #151719;
+        --ink: #f2f2f2;
+        --muted: #b8bec8;
+        --line: #d8dee9;
+        --direct: #2a2f35;
+        --proxy: #1f442b;
+        --chain: #594617;
+        --node: #173852;
+        --site: #5a2927;
+      }
+    }
+    svg { background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .title { fill: var(--ink); font-size: 34px; font-weight: 800; }
+    .subtitle { fill: var(--muted); font-size: 17px; }
+    .row { fill: transparent; stroke: var(--line); stroke-width: 2; stroke-dasharray: 7 8; rx: 24; }
+    .box { stroke: var(--line); stroke-width: 2.5; rx: 16; }
+    .direct { fill: var(--direct); }
+    .proxy { fill: var(--proxy); }
+    .chain { fill: var(--chain); }
+    .node { fill: var(--node); }
+    .site { fill: var(--site); }
+    .label { fill: var(--ink); font-size: 22px; font-weight: 760; text-anchor: middle; }
+    .small { fill: var(--muted); font-size: 15px; text-anchor: middle; }
+    .arrow { stroke: var(--line); stroke-width: 3.2; fill: none; marker-end: url(#arrow); }
+    .caption { fill: var(--ink); font-size: 22px; font-weight: 800; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="var(--line)" />
+    </marker>
+  </defs>
+
+  <text x="60" y="66" class="title">三种访问路径：直连、普通代理、链式代理</text>
+  <text x="60" y="102" class="subtitle">判断问题时先问：请求到底从哪里出去？目标网站看到的是谁的 IP？</text>
+
+  <rect x="60" y="145" width="1080" height="150" class="row"/>
+  <text x="90" y="185" class="caption">1. 直连</text>
+  <rect x="170" y="205" width="190" height="66" class="box direct"/>
+  <text x="265" y="232" class="label">你的设备</text>
+  <text x="265" y="255" class="small">真实网络出口</text>
+  <rect x="850" y="205" width="190" height="66" class="box site"/>
+  <text x="945" y="232" class="label">目标网站</text>
+  <text x="945" y="255" class="small">看到你的真实 IP</text>
+  <path d="M360 238 C530 238 680 238 850 238" class="arrow"/>
+
+  <rect x="60" y="335" width="1080" height="170" class="row"/>
+  <text x="90" y="377" class="caption">2. 普通代理</text>
+  <rect x="130" y="420" width="170" height="66" class="box direct"/>
+  <text x="215" y="447" class="label">你的设备</text>
+  <text x="215" y="470" class="small">浏览器 / App</text>
+  <rect x="410" y="420" width="190" height="66" class="box proxy"/>
+  <text x="505" y="447" class="label">客户端</text>
+  <text x="505" y="470" class="small">本地 7890 / 10808</text>
+  <rect x="700" y="420" width="170" height="66" class="box node"/>
+  <text x="785" y="447" class="label">节点</text>
+  <text x="785" y="470" class="small">出口 IP</text>
+  <rect x="970" y="420" width="140" height="66" class="box site"/>
+  <text x="1040" y="447" class="label">网站</text>
+  <text x="1040" y="470" class="small">看到节点</text>
+  <path d="M300 453 C345 453 365 453 410 453" class="arrow"/>
+  <path d="M600 453 C645 453 655 453 700 453" class="arrow"/>
+  <path d="M870 453 C915 453 925 453 970 453" class="arrow"/>
+
+  <rect x="60" y="545" width="1080" height="215" class="row"/>
+  <text x="90" y="587" class="caption">3. 链式代理</text>
+  <rect x="115" y="640" width="150" height="66" class="box direct"/>
+  <text x="190" y="667" class="label">设备</text>
+  <text x="190" y="690" class="small">发起请求</text>
+  <rect x="340" y="640" width="150" height="66" class="box proxy"/>
+  <text x="415" y="667" class="label">客户端</text>
+  <text x="415" y="690" class="small">规则/路由</text>
+  <rect x="565" y="640" width="150" height="66" class="box chain"/>
+  <text x="640" y="667" class="label">节点 A</text>
+  <text x="640" y="690" class="small">第一跳</text>
+  <rect x="790" y="640" width="150" height="66" class="box node"/>
+  <text x="865" y="667" class="label">节点 B</text>
+  <text x="865" y="690" class="small">最终出口</text>
+  <rect x="1010" y="640" width="110" height="66" class="box site"/>
+  <text x="1065" y="667" class="label">网站</text>
+  <text x="1065" y="690" class="small">看 B</text>
+  <path d="M265 673 C295 673 310 673 340 673" class="arrow"/>
+  <path d="M490 673 C520 673 535 673 565 673" class="arrow"/>
+  <path d="M715 673 C745 673 760 673 790 673" class="arrow"/>
+  <path d="M940 673 C970 673 980 673 1010 673" class="arrow"/>
+  <text x="600" y="745" class="subtitle" text-anchor="middle">链式代理更复杂：可增强路径控制，但会增加延迟、故障点和排查难度。</text>
+</svg>
