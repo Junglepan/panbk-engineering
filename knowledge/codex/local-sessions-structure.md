@@ -1,3 +1,10 @@
+---
+title: Codex 本地会话文件结构与统计口径
+date: 2026-05-16
+tags: [codex, claude-code, 会话]
+status: complete
+---
+
 # Claude & Codex 本地会话文件结构与统计口径
 
 日期：2026-05-16

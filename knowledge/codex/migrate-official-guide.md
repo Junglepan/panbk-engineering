@@ -1,3 +1,10 @@
+---
+title: Codex 官方迁移思路总结
+date: 2026-05-15
+tags: [codex, 迁移]
+status: complete
+---
+
 # migrate-to-codex 官方思路总结
 
 日期：2026-05-15  

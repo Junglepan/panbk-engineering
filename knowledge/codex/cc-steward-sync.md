@@ -1,3 +1,10 @@
+---
+title: CC 与 Codex 管家模式同步对照分析
+date: 2026-05-15
+tags: [codex, claude-code, 迁移]
+status: complete
+---
+
 # migrate-to-codex 与 ClaudeCodex-Together 同步逻辑对照分析
 
 日期：2026-05-15  

@@ -1,14 +1,14 @@
 # Project Instructions
 
 This repository is panbk's personal engineering workspace, containing:
-- `panbk-agent-config/` — dotfiles and terminal tool configuration (zsh, ghostty, yazi)
-- `panbk-agent-knowledge/` — Claude Code usage notes and best practice references
+- `knowledge/` — technical knowledge documents organized by topic
+- `config/` — dotfiles and agent configuration (claude, codex, terminal tools)
 - `scripts/` — utility scripts for environment setup and verification
 
 Keep changes small, explicit, and easy to review.
 
 ## Workflow
-- Read `AGENTS.md`, `MEMORY.md`, and `HANDOFF.md` in that order before starting non-trivial work.
+- Read `AGENTS.md`, `.claude/MEMORY.md`, and `.claude/HANDOFF.md` in that order before starting non-trivial work.
 - Explore first, then implement. For non-trivial changes: Design → Plan → Implement → Verify.
 - Keep plans concrete: list target files, expected behavior, and verification commands.
 - Before finishing, run targeted checks for changed files and summarize what you verified.
@@ -32,11 +32,10 @@ Keep changes small, explicit, and easy to review.
 
 ## Sub-project Notes
 
-### panbk-agent-config
-- Dotfiles managed here are applied via `./scripts/apply-dotfiles.sh`.
-- Source of truth: files under `dotfiles/` directory.
-- After changes, verify with the commands in `docs/terminal-config.md`.
+### config/
+- Dotfiles managed here are applied via `./config/apply-dotfiles.sh`.
+- Source of truth: files under `config/terminal/`.
 
-### panbk-agent-knowledge
+### knowledge/
 - Knowledge files are reference documents, not executable configs.
-- Naming convention: `<topic>-<YYYY-MM-DD>-<summary>.md`
+- Organized by topic in subdirectories (ai-agent, codex, networking, incidents).

@@ -1,3 +1,10 @@
+---
+title: Codex 迁移全面分析
+date: 2026-05-12
+tags: [codex, 迁移, claude-code]
+status: complete
+---
+
 # migrate-to-codex 全面分析
 
 日期：2026-05-12  

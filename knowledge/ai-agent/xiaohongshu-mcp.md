@@ -1,3 +1,10 @@
+---
+title: 小红书 MCP 架构与实现原理
+date: 2026-04-16
+tags: [mcp, 小红书, 架构]
+status: complete
+---
+
 # xiaohongshu-mcp 架构与实现原理
 
 > 日期：2026-04-16  

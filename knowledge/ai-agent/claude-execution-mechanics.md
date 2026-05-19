@@ -1,3 +1,10 @@
+---
+title: Claude Code 执行机制全景分析
+date: 2026-04-18
+tags: [claude-code, agent, 架构]
+status: complete
+---
+
 # Claude Code 执行机制全景分析
 
 > 本文档基于 Claude Code CLI/桌面端/IDE 插件的可观测行为与系统机制，系统梳理会话、Session、记忆、Skill、工具调用等核心底层逻辑。

@@ -1,3 +1,10 @@
+---
+title: V2RayN 与 Claude OAuth 冲突排查复盘
+date: 2026-04-11
+tags: [v2ray, claude-code, oauth, 故障复盘]
+status: complete
+---
+
 # Claude + v2rayN 连接与认证故障复盘（2026-04-11）
 
 ## 1. 事件摘要

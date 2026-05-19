@@ -1,3 +1,10 @@
+---
+title: MCP 全面理解：协议、架构与概念对比
+date: 2026-04-16
+tags: [mcp, agent, 协议]
+status: complete
+---
+
 # MCP 全面理解：协议、架构与概念对比
 
 > 日期：2026-04-16
