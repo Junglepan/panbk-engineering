@@ -6,6 +6,15 @@ cd "$ROOT_DIR"
 
 echo "[verify] root: $ROOT_DIR"
 
+if [ -d knowledge ] && [ -f scripts/build-html.py ]; then
+  if command -v uv >/dev/null 2>&1; then
+    echo "[verify] running: build knowledge HTML"
+    uv run scripts/build-html.py
+  else
+    echo "[verify] skip knowledge HTML build (uv not installed)"
+  fi
+fi
+
 if [ -f package.json ]; then
   echo "[verify] detected Node project"
   if npm run | rg -q "\blint\b"; then
