@@ -3,168 +3,468 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>migrate-to-codex 全面分析</title>
+  <title>Codex 迁移全面分析</title>
   <style>
-    :root {
-      color-scheme: light;
-      --bg: #f7f8fb;
-      --paper: #ffffff;
-      --text: #1f2937;
-      --muted: #667085;
-      --line: #d9dee8;
-      --accent: #0f766e;
-      --accent-2: #7c2d12;
-      --code-bg: #f1f5f9;
-      --table-head: #eef6f5;
-    }
-    * {
-      box-sizing: border-box;
-    }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-      line-height: 1.68;
-    }
-    main {
-      max-width: 1080px;
-      margin: 0 auto;
-      padding: 48px 24px 72px;
-    }
-    article {
-      background: var(--paper);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 42px;
-      box-shadow: 0 12px 36px rgba(15, 23, 42, 0.06);
-    }
-    h1 {
-      margin: 0 0 8px;
-      font-size: 34px;
-      line-height: 1.2;
-      letter-spacing: 0;
-      color: #111827;
-    }
-    .meta {
-      color: var(--muted);
-      margin-bottom: 32px;
-    }
-    h2 {
-      margin: 38px 0 14px;
-      padding-top: 6px;
-      border-top: 1px solid var(--line);
-      font-size: 24px;
-      line-height: 1.28;
-      letter-spacing: 0;
-      color: #111827;
-    }
-    h3 {
-      margin: 28px 0 10px;
-      font-size: 19px;
-      line-height: 1.35;
-      letter-spacing: 0;
-      color: #163b3a;
-    }
-    p {
-      margin: 10px 0;
-    }
-    ul, ol {
-      margin: 8px 0 16px 24px;
-      padding: 0;
-    }
-    li {
-      margin: 4px 0;
-    }
-    code {
-      padding: 2px 5px;
-      border-radius: 4px;
-      background: var(--code-bg);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.92em;
-    }
-    pre {
-      overflow-x: auto;
-      padding: 14px 16px;
-      border-radius: 8px;
-      border: 1px solid var(--line);
-      background: #0f172a;
-      color: #e5e7eb;
-      line-height: 1.5;
-    }
-    pre code {
-      padding: 0;
-      background: transparent;
-      color: inherit;
-    }
-    table {
-      width: 100%;
-      margin: 14px 0 22px;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-    th, td {
-      border: 1px solid var(--line);
-      padding: 9px 10px;
-      vertical-align: top;
-      text-align: left;
-    }
-    th {
-      background: var(--table-head);
-      color: #134e4a;
-    }
-    .lead {
-      font-size: 18px;
-      color: #243041;
-      border-left: 4px solid var(--accent);
-      padding-left: 14px;
-      margin: 18px 0 28px;
-    }
-    .note {
-      background: #fff7ed;
-      border: 1px solid #fed7aa;
-      border-radius: 8px;
-      padding: 14px 16px;
-      color: var(--accent-2);
-      margin: 18px 0;
-    }
-    @media (max-width: 760px) {
-      main {
-        padding: 20px 12px 40px;
-      }
-      article {
-        padding: 24px 18px;
-      }
-      h1 {
-        font-size: 28px;
-      }
-      h2 {
-        font-size: 21px;
-      }
-      table {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
-      }
-    }
+:root {
+  color-scheme: light;
+  --bg: #f7f8fb;
+  --paper: #ffffff;
+  --text: #1f2937;
+  --text-strong: #111827;
+  --muted: #667085;
+  --line: #d9dee8;
+  --accent: #0f766e;
+  --accent-soft: #eef6f5;
+  --accent-deep: #134e4a;
+  --warn: #7c2d12;
+  --code-bg: #f1f5f9;
+  --code-block-bg: #0f172a;
+  --code-block-fg: #e5e7eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 16px;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.68;
+}
+
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 32px;
+  align-items: start;
+}
+
+main.no-toc {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1000px;
+}
+
+article {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 42px 48px;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.05);
+  min-width: 0;
+}
+
+/* Header block */
+.doc-header h1 {
+  margin: 0 0 12px;
+  font-size: 32px;
+  line-height: 1.25;
+  color: var(--text-strong);
+}
+
+.doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.doc-meta .date {
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-meta .sep {
+  color: var(--line);
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.status {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.status-complete { background: #dcfce7; color: #166534; }
+.status-wip      { background: #fef3c7; color: #92400e; }
+.status-draft    { background: #e5e7eb; color: #4b5563; }
+
+.doc-meta-extra {
+  background: var(--accent-soft);
+  border: 1px solid #d6e9e7;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 20px;
+  color: var(--accent-deep);
+  font-size: 14px;
+}
+.doc-meta-extra dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.doc-meta-extra dt {
+  font-weight: 500;
+}
+.doc-meta-extra dd {
+  margin: 0;
+}
+
+.lead {
+  font-size: 17px;
+  color: #243041;
+  border-left: 4px solid var(--accent);
+  padding: 4px 0 4px 14px;
+  margin: 16px 0 28px;
+}
+
+/* Headings inside body */
+.doc-body h2 {
+  margin: 38px 0 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 23px;
+  line-height: 1.3;
+  color: var(--text-strong);
+  scroll-margin-top: 16px;
+}
+.doc-body h3 {
+  margin: 26px 0 10px;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--accent-deep);
+  scroll-margin-top: 16px;
+}
+.doc-body h4 {
+  margin: 20px 0 8px;
+  font-size: 16px;
+  color: var(--text-strong);
+}
+
+.doc-body h2 .header-anchor,
+.doc-body h3 .header-anchor,
+.doc-body h4 .header-anchor {
+  margin-left: 8px;
+  color: var(--line);
+  text-decoration: none;
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.doc-body h2:hover .header-anchor,
+.doc-body h3:hover .header-anchor,
+.doc-body h4:hover .header-anchor {
+  opacity: 1;
+}
+
+/* Text content */
+.doc-body p { margin: 10px 0; }
+.doc-body ul, .doc-body ol { margin: 8px 0 16px 24px; padding: 0; }
+.doc-body li { margin: 4px 0; }
+.doc-body li > p { margin: 4px 0; }
+
+.doc-body blockquote {
+  border-left: 4px solid var(--line);
+  padding: 4px 0 4px 14px;
+  margin: 14px 0;
+  color: var(--muted);
+}
+
+.doc-body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 24px 0;
+}
+
+/* Inline code & code blocks */
+.doc-body code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.code-wrap {
+  position: relative;
+  margin: 14px 0;
+}
+.code-wrap pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--code-block-bg);
+  color: var(--code-block-fg);
+  line-height: 1.5;
+  font-size: 13.5px;
+}
+.code-wrap pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.code-wrap:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.copy-btn.copied { color: #86efac; }
+
+/* Tables */
+.doc-body table {
+  width: 100%;
+  margin: 14px 0 22px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.doc-body th, .doc-body td {
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  vertical-align: top;
+  text-align: left;
+}
+.doc-body th {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 500;
+}
+
+/* Admonitions (GitHub-style) */
+.admonition {
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 18px 0;
+  border: 1px solid;
+  background: #fff;
+}
+.admonition-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+.admonition-title::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.admonition > p:last-child { margin-bottom: 0; }
+.admonition > p:first-of-type { margin-top: 0; }
+
+.admonition.note      { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.admonition.tip       { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.admonition.important { background: #f5f3ff; border-color: #ddd6fe; color: #5b21b6; }
+.admonition.warning   { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.admonition.caution   { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+.admonition > p { color: var(--text); }
+
+/* Images */
+.doc-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+/* Links */
+.doc-body a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+.doc-body a:hover {
+  border-bottom-color: var(--accent);
+}
+
+/* TOC sidebar */
+aside.toc {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 16px 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+aside.toc .toc-title {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+aside.toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+aside.toc li { margin: 4px 0; }
+aside.toc a {
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border-left: 2px solid transparent;
+  line-height: 1.45;
+}
+aside.toc a:hover {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+aside.toc .toc-l3 a {
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Footer */
+.doc-footer {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.doc-footer code {
+  background: var(--code-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Narrow screens */
+@media (max-width: 980px) {
+  main {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px 12px 40px;
+  }
+  article {
+    padding: 24px 18px;
+  }
+  .doc-header h1 { font-size: 26px; }
+  .doc-body h2 { font-size: 20px; }
+  .doc-body table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  aside.toc {
+    position: static;
+    max-height: none;
+    order: -1;
+  }
+  aside.toc.collapsible {
+    padding: 0;
+  }
+  aside.toc.collapsible summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    list-style: none;
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  aside.toc.collapsible .toc-body {
+    padding: 0 16px 14px;
+  }
+  aside.toc.collapsible .toc-title { display: none; }
+}
+
   </style>
 </head>
 <body>
-<main>
+<main class="">
 <article>
-<h1>migrate-to-codex 全面分析</h1>
-<div class="meta">日期：2026-05-12<br>对象：<code>/Users/panbk/.codex/skills/migrate-to-codex</code></div>
+  <header class="doc-header">
+    <h1>Codex 迁移全面分析</h1>
+    <div class="doc-meta"><span class="date">2026-05-12</span>
+        <span class="tag-chip">codex</span>
+        <span class="tag-chip">迁移</span>
+        <span class="tag-chip">claude-code</span>
+        <span class="status status-complete">complete</span></div>
 
-<p class="lead"><code>migrate-to-codex</code> 是一个把 Claude Code 生态中的配置、指令、skills、slash commands、subagents、MCP 与部分 hooks 迁移到 Codex 生态的本地迁移器。它的本质不是完全自动等价转换，而是静态扫描、结构化转换、风险标注和验证。</p>
-
-<h2>目的与作用</h2>
-<p>它的主要目标是降低 Claude Code 用户迁移到 Codex 的人工成本，把分散在 <code>.claude/</code>、<code>.mcp.json</code>、<code>.claude.json</code>、<code>CLAUDE.md</code> 等位置的资产转换为 Codex 可识别的文件。</p>
-<p>它适合作为迁移第一步：快速盘点资产，批量生成 Codex 基础文件，再由人或 agent 修复语义差异。它不适合作为无人值守的最终迁移器，尤其是权限、hooks、slash command 参数展开、插件、子代理运行模型等部分。</p>
-
-<h2>总体架构</h2>
-<pre><code>migrate-to-codex/
+    <div class="lead">日期：2026-05-12<br />
+对象：<code>/Users/panbk/.codex/skills/migrate-to-codex</code></div>
+  </header>
+  <div class="doc-body">
+<h2 id="一句话定位">一句话定位<a class="header-anchor" href="#一句话定位">#</a></h2>
+<p><code>migrate-to-codex</code> 是一个把 Claude Code 生态中的配置、指令、skills、slash commands、subagents、MCP 与部分 hooks 迁移到 Codex 生态的本地迁移器。它的本质不是“完全自动等价转换”，而是“静态扫描 + 结构化转换 + 风险标注 + 验证”的迁移辅助工具。</p>
+<p>它能自动迁移结构明确、语义接近的内容；对运行时语义不同、权限边界不同、生命周期不同、插件体系不同的内容，它会保留为 Codex 可见的提示或报告项，并要求人工复核。</p>
+<h2 id="目的与作用">目的与作用<a class="header-anchor" href="#目的与作用">#</a></h2>
+<h3 id="主要目的">主要目的<a class="header-anchor" href="#主要目的">#</a></h3>
+<ol>
+<li>降低 Claude Code 用户迁移到 Codex 的人工成本。</li>
+<li>把分散在 <code>.claude/</code>、<code>.mcp.json</code>、<code>.claude.json</code>、<code>CLAUDE.md</code> 等位置的配置转换为 Codex 可识别的文件。</li>
+<li>在可转换与不可转换之间划清边界，避免伪装成 1:1 迁移。</li>
+<li>生成迁移报告，让使用者知道哪些项目已经写入、哪些项目需要人工检查。</li>
+<li>通过 <code>--validate-target</code> 检查迁移后的 Codex 目标目录是否至少在格式层面可用。</li>
+</ol>
+<h3 id="实际价值">实际价值<a class="header-anchor" href="#实际价值">#</a></h3>
+<p>它适合用作迁移的第一步：快速盘点现有 Claude Code 资产，批量生成 Codex 版本的基础文件，然后由人或 agent 继续修复语义差异。</p>
+<p>它不适合直接作为“无人值守的最终迁移器”。尤其是权限、hooks、slash command 参数展开、插件、子代理运行模型等部分，迁移结果必须复核。</p>
+<h2 id="总体架构">总体架构<a class="header-anchor" href="#总体架构">#</a></h2>
+<p>项目目录按职责拆分：</p>
+<pre><code class="language-text">migrate-to-codex/
 ├── SKILL.md
-├── references/differences.md
+├── references/
+│   └── differences.md
+├── agents/
+│   └── openai.yaml
 └── scripts/
     ├── migrate-to-codex.py
     ├── cli.py
@@ -180,164 +480,1050 @@
     │   └── settings.py
     └── utils/
         ├── scan.py
-        └── util.py</code></pre>
-
+        └── util.py
+</code></pre>
+<h3 id="模块职责">模块职责<a class="header-anchor" href="#模块职责">#</a></h3>
 <table>
-<thead><tr><th>模块</th><th>职责</th></tr></thead>
+<thead>
+<tr>
+<th>模块</th>
+<th>职责</th>
+</tr>
+</thead>
 <tbody>
-<tr><td><code>SKILL.md</code></td><td>定义 agent 使用迁移器时的流程、顺序、报告格式与自愈循环。</td></tr>
-<tr><td><code>references/differences.md</code></td><td>记录 Claude Code 与 Codex 的可映射项、部分映射项和不支持项。</td></tr>
-<tr><td><code>cli.py</code></td><td>CLI 编排层：参数、扫描、规划、部署、报告和校验。</td></tr>
-<tr><td><code>common.py</code></td><td>共享数据模型、frontmatter 解析、报告模型、路径常量、模型和权限映射。</td></tr>
-<tr><td><code>instructions.py</code></td><td>把 Claude/Codex instruction 文件迁移为 <code>AGENTS.md</code>。</td></tr>
-<tr><td><code>skills.py</code></td><td>把 Claude skills 和 slash commands 转成 Codex skills。</td></tr>
-<tr><td><code>codex_config.py</code> / <code>mcps.py</code></td><td>生成 <code>.codex/config.toml</code> 并转换 MCP server 表。</td></tr>
-<tr><td><code>hooks.py</code></td><td>将部分 Claude hooks 转成 <code>.codex/hooks.json</code>。</td></tr>
-<tr><td><code>agents.py</code></td><td>将 <code>.claude/agents/*.md</code> 转成 <code>.codex/agents/*.toml</code>。</td></tr>
-<tr><td><code>plugins.py</code></td><td>只报告 Claude plugins / marketplaces 需要人工迁移。</td></tr>
+<tr>
+<td><code>SKILL.md</code></td>
+<td>定义 agent 使用该迁移器时的操作流程、顺序、报告格式与自愈循环。</td>
+</tr>
+<tr>
+<td><code>references/differences.md</code></td>
+<td>记录 Claude Code 与 Codex 的迁移差异、可映射项、部分映射项和不支持项。</td>
+</tr>
+<tr>
+<td><code>scripts/migrate-to-codex.py</code></td>
+<td>入口文件，只负责引入 <code>cli.main()</code>。</td>
+</tr>
+<tr>
+<td><code>scripts/cli.py</code></td>
+<td>CLI 编排层：解析参数、选择组件、扫描、规划、部署、报告、校验。</td>
+</tr>
+<tr>
+<td><code>migrate/common.py</code></td>
+<td>共享数据模型、frontmatter 解析、报告模型、路径常量、模型/权限映射。</td>
+</tr>
+<tr>
+<td><code>migrate/instructions.py</code></td>
+<td>将 <code>CLAUDE.md</code> / <code>claude.md</code> / <code>AGENTS.md</code> 迁移为 Codex <code>AGENTS.md</code>。</td>
+</tr>
+<tr>
+<td><code>migrate/skills.py</code></td>
+<td>将 Claude skills 和 slash commands 转成 Codex skills。</td>
+</tr>
+<tr>
+<td><code>migrate/codex_config.py</code></td>
+<td>生成 <code>.codex/config.toml</code>，整合模型、沙箱、MCP、hooks feature flag。</td>
+</tr>
+<tr>
+<td><code>migrate/mcps.py</code></td>
+<td>读取 <code>.mcp.json</code> / <code>.claude.json</code>，转换 MCP server 表。</td>
+</tr>
+<tr>
+<td><code>migrate/hooks.py</code></td>
+<td>将部分 Claude hooks 转成 <code>.codex/hooks.json</code>。</td>
+</tr>
+<tr>
+<td><code>migrate/agents.py</code></td>
+<td>将 <code>.claude/agents/*.md</code> 转成 <code>.codex/agents/*.toml</code>。</td>
+</tr>
+<tr>
+<td><code>migrate/plugins.py</code></td>
+<td>只报告 Claude plugins / marketplaces 需要人工迁移，不自动复制。</td>
+</tr>
+<tr>
+<td><code>utils/scan.py</code></td>
+<td>渲染源目录资产清单与迁移面清单。</td>
+</tr>
+<tr>
+<td><code>utils/util.py</code></td>
+<td>JSONC、简化 YAML frontmatter、TOML 渲染、slug 等通用工具。</td>
+</tr>
 </tbody>
 </table>
-
-<h2>底层实现原理</h2>
-<h3>迁移面抽象</h3>
-<p>迁移器把 Claude Code 资产拆成 instructions、plugins、hooks、skills and commands、config and MCP、subagents。<code>cli.convert_scope()</code> 以固定顺序调用各 surface 的转换函数，并汇总为统一的 <code>ConversionResult</code>。</p>
+<h2 id="底层实现原理">底层实现原理<a class="header-anchor" href="#底层实现原理">#</a></h2>
+<h3 id="1-迁移面抽象">1. 迁移面抽象<a class="header-anchor" href="#1-迁移面抽象">#</a></h3>
+<p>迁移器把 Claude Code 资产拆成几个 surface：</p>
+<ol>
+<li>instructions</li>
+<li>plugins</li>
+<li>hooks</li>
+<li>skills and commands</li>
+<li>config and MCP</li>
+<li>subagents</li>
+</ol>
+<p><code>cli.convert_scope()</code> 以固定顺序调用各 surface 的转换函数，并把结果汇总为统一的 <code>ConversionResult</code>。</p>
+<p>统一结果包含三类信息：</p>
 <table>
-<thead><tr><th>数据</th><th>含义</th></tr></thead>
+<thead>
+<tr>
+<th>数据</th>
+<th>含义</th>
+</tr>
+</thead>
 <tbody>
-<tr><td><code>summary</code></td><td>数量统计，例如 skills、subagents、MCP server 数量。</td></tr>
-<tr><td><code>artifacts</code></td><td>准备写入 Codex 目标目录的文件、复制项或 symlink。</td></tr>
-<tr><td><code>report_items</code></td><td>报告项，说明已转换、需要人工复核或不支持。</td></tr>
+<tr>
+<td><code>summary</code></td>
+<td>数量统计，例如 skills、subagents、MCP server 数量。</td>
+</tr>
+<tr>
+<td><code>artifacts</code></td>
+<td>准备写入 Codex 目标目录的文件、复制项或 symlink。</td>
+</tr>
+<tr>
+<td><code>report_items</code></td>
+<td>报告项，说明已转换、需要人工复核或不支持。</td>
+</tr>
 </tbody>
 </table>
-
-<h3>Artifact 模型</h3>
-<p>迁移输出统一表达为 <code>PlannedArtifact</code>。payload 有三种：<code>GeneratedText</code> 写入生成文本，<code>SourceCopy</code> 复制源文件，<code>SourceSymlink</code> 创建 symlink。这让 instructions、skills、config 和 subagents 都能用同一套部署逻辑。</p>
-
-<h3>扫描、规划、部署分离</h3>
+<p>这个设计的关键是：转换阶段只生成计划和内容，不直接写文件。真正写入由部署阶段统一处理。</p>
+<h3 id="2-artifact-模型">2. Artifact 模型<a class="header-anchor" href="#2-artifact-模型">#</a></h3>
+<p>迁移输出统一表达为 <code>PlannedArtifact</code>：</p>
 <table>
-<thead><tr><th>模式</th><th>作用</th></tr></thead>
+<thead>
+<tr>
+<th>payload 类型</th>
+<th>行为</th>
+</tr>
+</thead>
 <tbody>
-<tr><td><code>--scan-only</code></td><td>只列出源目录中存在的支持项。</td></tr>
-<tr><td><code>--plan</code></td><td>列出阶段、目标 artifact 和人工复核项，不写文件。</td></tr>
-<tr><td><code>--doctor</code></td><td>评估就绪度，统计人工复核、冲突、孤儿文件风险。</td></tr>
-<tr><td><code>--dry-run</code></td><td>模拟迁移并输出完整报告。</td></tr>
-<tr><td><code>--validate-target</code></td><td>验证已有 Codex 目标目录的格式和基本可用性。</td></tr>
+<tr>
+<td><code>GeneratedText</code></td>
+<td>写入新生成的文本内容。</td>
+</tr>
+<tr>
+<td><code>SourceCopy</code></td>
+<td>从源文件复制到目标路径。</td>
+</tr>
+<tr>
+<td><code>SourceSymlink</code></td>
+<td>在目标位置创建指向源文件的 symlink。</td>
+</tr>
 </tbody>
 </table>
-
-<h3>部署策略</h3>
-<p>默认是 <code>merge</code>：写入计划中的 artifact，保留未被本次计划覆盖的旧 Codex skills / agents。<code>--replace</code> 会删除孤儿生成物，更接近“目标目录等于源目录映射结果”。</p>
-
-<h2>可适配内容范围</h2>
+<p>这让不同 surface 可以用同一种方式输出目标文件。例如：</p>
+<ol>
+<li><code>AGENTS.md</code> 可以是 symlink，也可以是生成文本。</li>
+<li>skill 支持文件可以是 <code>SourceCopy</code>。</li>
+<li><code>.codex/config.toml</code> 是 <code>GeneratedText</code>。</li>
+<li><code>.codex/agents/*.toml</code> 是 <code>GeneratedText</code>。</li>
+</ol>
+<h3 id="3-扫描规划部署分离">3. 扫描、规划、部署分离<a class="header-anchor" href="#3-扫描规划部署分离">#</a></h3>
+<p>CLI 提供四类主要模式：</p>
 <table>
-<thead><tr><th>内容</th><th>适配程度</th><th>说明</th></tr></thead>
+<thead>
+<tr>
+<th>模式</th>
+<th>作用</th>
+</tr>
+</thead>
 <tbody>
-<tr><td>provider-neutral instructions</td><td>高</td><td>可 symlink 到 <code>AGENTS.md</code>。</td></tr>
-<tr><td>普通 Claude skills</td><td>高</td><td>prompt 与 <code>scripts/</code>、<code>references/</code>、<code>assets/</code> 可迁移。</td></tr>
-<tr><td>MCP stdio/http 基础配置</td><td>中高</td><td>command、args、url、env、headers 可迁移。</td></tr>
-<tr><td>基础 subagent prompt</td><td>中高</td><td>可转为 Codex custom-agent TOML。</td></tr>
-<tr><td>model / effort</td><td>中</td><td>按模型族做启发式映射。</td></tr>
-<tr><td><code>acceptEdits</code> / <code>readOnly</code></td><td>中</td><td>可映射为 Codex sandbox。</td></tr>
+<tr>
+<td><code>--scan-only</code></td>
+<td>只列出源目录中存在的支持项，不需要 target。</td>
+</tr>
+<tr>
+<td><code>--plan</code></td>
+<td>生成迁移计划，列出阶段、目标 artifact 和人工复核项，但不写文件。</td>
+</tr>
+<tr>
+<td><code>--doctor</code></td>
+<td>评估迁移就绪度，统计人工复核、冲突、孤儿文件风险。</td>
+</tr>
+<tr>
+<td>普通运行 / <code>--dry-run</code></td>
+<td>执行或模拟执行迁移，并输出 summary、inventory、surface 和 report。</td>
+</tr>
+<tr>
+<td><code>--validate-target</code></td>
+<td>验证已有 Codex 目标目录的格式和基本可用性。</td>
+</tr>
 </tbody>
 </table>
-
-<h2>需要人工复核的内容</h2>
+<p>这个分层让迁移过程更安全：</p>
+<ol>
+<li>先扫描源资产。</li>
+<li>再看迁移计划。</li>
+<li>再做 dry-run。</li>
+<li>确认后写入目标目录。</li>
+<li>最后验证目标目录。</li>
+</ol>
+<h3 id="4-scope-处理">4. Scope 处理<a class="header-anchor" href="#4-scope-处理">#</a></h3>
+<p>迁移器支持两种 source shape：</p>
+<ol>
+<li>单 scope：例如 <code>--source ~/.claude/ --target ~/.codex/</code> 或项目内 <code>./.claude/ -&gt; ./.codex/</code>。</li>
+<li>tree scope：如果 source 下同时有 <code>global/</code> 和 <code>project/</code>，会分别转换为 target 下的 <code>global/</code> 与 <code>project/</code>。</li>
+</ol>
+<p>内部用 <code>ScopePaths(source, is_global)</code> 表示 scope。全局 scope 和项目 scope 在 instruction 候选文件上略有不同：项目 scope 不从 <code>.claude/CLAUDE.md</code> 读取 instruction 候选。</p>
+<h3 id="5-merge-与-replace-策略">5. merge 与 replace 策略<a class="header-anchor" href="#5-merge-与-replace-策略">#</a></h3>
+<p>默认部署模式是 <code>merge</code>：</p>
+<ol>
+<li>写入计划中的 artifact。</li>
+<li>保留目标目录中未被本次计划覆盖的旧 skills / agents。</li>
+</ol>
+<p><code>--replace</code> 会额外删除孤儿生成物：</p>
+<ol>
+<li><code>.agents/skills/*</code> 中本次计划没有生成的 skill 目录。</li>
+<li><code>.codex/agents/*.toml</code> 中本次计划没有生成的 agent 文件。</li>
+</ol>
+<p>这使得 <code>merge</code> 更保守，<code>replace</code> 更接近“目标目录等于源目录映射结果”。</p>
+<h2 id="各内容范围与转换策略">各内容范围与转换策略<a class="header-anchor" href="#各内容范围与转换策略">#</a></h2>
+<h2 id="1-instructions">1. Instructions<a class="header-anchor" href="#1-instructions">#</a></h2>
+<h3 id="支持的来源">支持的来源<a class="header-anchor" href="#支持的来源">#</a></h3>
+<p>候选文件：</p>
+<ol>
+<li><code>.claude/CLAUDE.md</code></li>
+<li><code>CLAUDE.md</code></li>
+<li><code>claude.md</code></li>
+<li><code>AGENTS.md</code></li>
+</ol>
+<p>目标：</p>
+<pre><code class="language-text">AGENTS.md
+</code></pre>
+<h3 id="转换策略">转换策略<a class="header-anchor" href="#转换策略">#</a></h3>
+<p>如果源文件是 <code>AGENTS.md</code>，迁移器认为 Codex instruction 已存在，只写报告，不覆盖自己。</p>
+<p>如果源文件是 Claude instruction，迁移器检查内容是否包含明显 Claude-only 标记：</p>
+<pre><code class="language-text">/hooks
+.claude/agents/
+.claude/settings
+Subagent
+subagent
+permissionMode
+ExitPlanMode
+</code></pre>
+<p>没有这些标记时，生成 <code>AGENTS.md</code> symlink，复用同一份 instruction。</p>
+<p>有这些标记时，生成一份 <code>AGENTS.md</code> 文本副本，并追加：</p>
+<pre><code class="language-text">## MANUAL MIGRATION REQUIRED
+</code></pre>
+<p>提示用户清理 Claude hooks、slash commands、subagent、permission mode 等假设。</p>
+<h3 id="设计思路">设计思路<a class="header-anchor" href="#设计思路">#</a></h3>
+<p>这个策略很保守：provider-neutral instruction 用 symlink 减少重复；一旦发现 Claude-only 语义，就断开 symlink，避免 Codex 直接继承不适配的行为描述。</p>
+<h2 id="2-skills-与-slash-commands">2. Skills 与 Slash Commands<a class="header-anchor" href="#2-skills-与-slash-commands">#</a></h2>
+<h3 id="支持的来源-1">支持的来源<a class="header-anchor" href="#支持的来源-1">#</a></h3>
+<p>Claude skills：</p>
+<pre><code class="language-text">.claude/skills/&lt;name&gt;/SKILL.md
+.claude/skills/&lt;name&gt;.md
+</code></pre>
+<p>Claude slash commands：</p>
+<pre><code class="language-text">.claude/commands/**/*.md
+</code></pre>
+<p>目标：</p>
+<pre><code class="language-text">.agents/skills/&lt;name&gt;/SKILL.md
+.agents/skills/source-command-&lt;name&gt;/SKILL.md
+</code></pre>
+<h3 id="skill-转换">Skill 转换<a class="header-anchor" href="#skill-转换">#</a></h3>
+<p>目录型 skill 会迁移：</p>
+<pre><code class="language-text">SKILL.md
+scripts/
+references/
+assets/
+</code></pre>
+<p>单文件 <code>.md</code> legacy skill 只转成一个 <code>SKILL.md</code>，不会复制 sibling 支持目录。</p>
+<p>Codex skill frontmatter 只保留：</p>
+<pre><code class="language-yaml">name: ...
+description: ...
+</code></pre>
+<p>Claude <code>allowed-tools</code> 不会变成 Codex 权限边界，只作为提示文字追加到 <code>MANUAL MIGRATION REQUIRED</code> 中。</p>
+<p>其他 Claude skill 字段也会进入人工复核报告，例如：</p>
+<pre><code class="language-text">user-invocable
+model
+effort
+disable-model-invocation
+argument-hint
+context
+agent
+hooks
+paths
+shell
+</code></pre>
+<h3 id="slash-command-转换">Slash Command 转换<a class="header-anchor" href="#slash-command-转换">#</a></h3>
+<p>每个 <code>.claude/commands/**/*.md</code> 会变成一个 Codex skill，命名规则类似：</p>
+<pre><code class="language-text">source-command-&lt;path-parts&gt;
+</code></pre>
+<p>例如：</p>
+<pre><code class="language-text">.claude/commands/review/pr.md
+</code></pre>
+<p>可能变成：</p>
+<pre><code class="language-text">.agents/skills/source-command-review-pr/SKILL.md
+</code></pre>
+<p>slash command 的 body 会被保留在 <code>## Command Template</code> 中。</p>
+<p>迁移器会检测以下 provider-specific 行为并标记人工复核：</p>
 <table>
-<thead><tr><th>内容</th><th>原因</th></tr></thead>
+<thead>
+<tr>
+<th>行为</th>
+<th>风险</th>
+</tr>
+</thead>
 <tbody>
-<tr><td>slash commands</td><td>参数、模板、文件引用、shell 插值运行时不等价。</td></tr>
-<tr><td><code>allowed-tools</code></td><td>Codex skill 没有同等硬权限字段。</td></tr>
-<tr><td>subagent <code>tools</code> / <code>disallowedTools</code></td><td>只能保留为 prompt guidance。</td></tr>
-<tr><td>subagent <code>skills</code></td><td>Codex 没有相同的 spawn-time preload 语义。</td></tr>
-<tr><td>hooks</td><td>生命周期和匹配范围不同。</td></tr>
-<tr><td>MCP auth fallback</td><td><code>${VAR:-default}</code> default 语义不保留。</td></tr>
-<tr><td>Claude-only instructions</td><td>需要人工改写为 Codex 语义。</td></tr>
+<tr>
+<td><code>$ARGUMENTS</code> / <code>$1</code></td>
+<td>Codex 不自动按 Claude slash command 方式展开参数。</td>
+</tr>
+<tr>
+<td><code>{{name}}</code></td>
+<td>模板变量只作为文本保留。</td>
+</tr>
+<tr>
+<td><code>!`command` </code></td>
+<td>shell 输出插值不会自动执行。</td>
+</tr>
+<tr>
+<td><code>@path</code></td>
+<td>自动文件引用展开需要改写成显式读取指令。</td>
+</tr>
+<tr>
+<td>unsupported frontmatter</td>
+<td>需要人工确认是否可转为 Codex skill 指令。</td>
+</tr>
 </tbody>
 </table>
-
-<h2>不自动迁移的内容</h2>
+<h3 id="设计思路-1">设计思路<a class="header-anchor" href="#设计思路-1">#</a></h3>
+<p>skills 是最适合自动迁移的内容，因为它们本质上是 prompt + 辅助文件。slash commands 则不同：它们依赖调用语法和运行时展开，所以迁移器只把它们包成 Codex skill，并明确要求人工改写调用语义。</p>
+<h2 id="3-mcp-与-codexconfigtoml">3. MCP 与 <code>.codex/config.toml</code><a class="header-anchor" href="#3-mcp-与-codexconfigtoml">#</a></h2>
+<h3 id="支持的来源-2">支持的来源<a class="header-anchor" href="#支持的来源-2">#</a></h3>
+<pre><code class="language-text">.mcp.json
+.claude.json
+.claude/settings.json
+.claude/settings.local.json
+</code></pre>
+<p>目标：</p>
+<pre><code class="language-text">.codex/config.toml
+</code></pre>
+<h3 id="迁移内容">迁移内容<a class="header-anchor" href="#迁移内容">#</a></h3>
+<p>从 Claude settings 中读取：</p>
 <table>
-<thead><tr><th>内容</th><th>原因</th></tr></thead>
+<thead>
+<tr>
+<th>Claude 字段</th>
+<th>Codex 字段</th>
+</tr>
+</thead>
 <tbody>
-<tr><td>Claude plugins</td><td>Codex plugin manifest 和布局不同。</td></tr>
-<tr><td>plugin marketplaces</td><td>不自动 fetch、install 或转换 marketplace。</td></tr>
-<tr><td>unsupported hook events</td><td>Codex 没有对应生命周期。</td></tr>
-<tr><td>HTTP / prompt / agent / async hooks</td><td>当前转换器只写 command hooks。</td></tr>
-<tr><td>subagent background / isolation / maxTurns</td><td>Codex custom-agent 文件不表达等价运行模型。</td></tr>
-<tr><td><code>.claude/settings.local.json</code> local-only 语义</td><td>Codex 项目配置信任模型不同。</td></tr>
+<tr>
+<td><code>model</code></td>
+<td><code>model</code>，按模型族映射。</td>
+</tr>
+<tr>
+<td><code>permissionMode</code></td>
+<td><code>sandbox_mode</code>，仅部分映射。</td>
+</tr>
+<tr>
+<td><code>enabledMcpjsonServers</code></td>
+<td>影响每个 MCP server 的 <code>enabled</code>。</td>
+</tr>
+<tr>
+<td><code>disabledMcpjsonServers</code></td>
+<td>影响每个 MCP server 的 <code>enabled = false</code>。</td>
+</tr>
+<tr>
+<td><code>hooks</code></td>
+<td>如果有可转换 hooks，则写 <code>[features].codex_hooks = true</code>。</td>
+</tr>
 </tbody>
 </table>
+<p>从 <code>.mcp.json</code> / <code>.claude.json</code> 读取：</p>
+<pre><code class="language-json">{
+  &quot;mcpServers&quot;: {
+    &quot;name&quot;: {
+      &quot;command&quot;: &quot;...&quot;,
+      &quot;args&quot;: [],
+      &quot;env&quot;: {},
+      &quot;url&quot;: &quot;...&quot;,
+      &quot;headers&quot;: {}
+    }
+  }
+}
+</code></pre>
+<p>转为：</p>
+<pre><code class="language-toml">personality = &quot;friendly&quot;
 
-<h2>各迁移面的策略</h2>
-<h3>Instructions</h3>
-<p>候选文件包括 <code>.claude/CLAUDE.md</code>、<code>CLAUDE.md</code>、<code>claude.md</code>、<code>AGENTS.md</code>。如果内容没有明显 Claude-only 标记，就创建 <code>AGENTS.md</code> symlink；如果包含 <code>/hooks</code>、<code>.claude/agents/</code>、<code>permissionMode</code>、<code>ExitPlanMode</code> 等标记，就生成副本并追加 <code>MANUAL MIGRATION REQUIRED</code>。</p>
+[mcp_servers.name]
+command = &quot;...&quot;
+args = [...]
+</code></pre>
+<p>只要生成 config，迁移器会加入：</p>
+<pre><code class="language-toml">personality = &quot;friendly&quot;
+</code></pre>
+<p>这是为了让从 Claude Code 迁移来的使用体验更接近原本偏友好的风格。</p>
+<h3 id="mcp-headers-与-env-映射">MCP headers 与 env 映射<a class="header-anchor" href="#mcp-headers-与-env-映射">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Claude 形态</th>
+<th>Codex 形态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>headers.Authorization = &quot;Bearer ${TOKEN}&quot;</code></td>
+<td><code>bearer_token_env_var = &quot;TOKEN&quot;</code></td>
+</tr>
+<tr>
+<td><code>headers.X-Key = &quot;${KEY}&quot;</code></td>
+<td><code>env_http_headers = { &quot;X-Key&quot; = &quot;KEY&quot; }</code></td>
+</tr>
+<tr>
+<td>静态 headers</td>
+<td><code>http_headers</code></td>
+</tr>
+<tr>
+<td><code>env.KEY = &quot;${KEY}&quot;</code></td>
+<td><code>env_vars = [&quot;KEY&quot;]</code></td>
+</tr>
+<tr>
+<td>静态 env</td>
+<td><code>env</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>${VAR:-default}</code> 这类 fallback 不会保留 default 语义，只能抽取变量名。</p>
+<h3 id="mcp-限制">MCP 限制<a class="header-anchor" href="#mcp-限制">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>内容</th>
+<th>处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type: sse</code></td>
+<td>Codex 当前不支持，标记人工复核。</td>
+</tr>
+<tr>
+<td><code>oauth.clientId</code>、<code>headersHelper</code> 等</td>
+<td>unsupported field，标记人工复核。</td>
+</tr>
+<tr>
+<td><code>allowedMcpServers</code> / <code>deniedMcpServers</code></td>
+<td>不写入，需人工转为 policy。</td>
+</tr>
+<tr>
+<td><code>.claude/settings.local.json</code></td>
+<td>没有完全等价的 Codex local-only 项。</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-hooks">4. Hooks<a class="header-anchor" href="#4-hooks">#</a></h2>
+<h3 id="支持的来源-3">支持的来源<a class="header-anchor" href="#支持的来源-3">#</a></h3>
+<pre><code class="language-text">.claude/settings.json
+.claude/settings.local.json
+</code></pre>
+<p>目标：</p>
+<pre><code class="language-text">.codex/hooks.json
+.codex/config.toml 中的 [features].codex_hooks = true
+</code></pre>
+<h3 id="支持的事件">支持的事件<a class="header-anchor" href="#支持的事件">#</a></h3>
+<p>迁移器只转换以下事件：</p>
+<pre><code class="language-text">PreToolUse
+PostToolUse
+SessionStart
+UserPromptSubmit
+Stop
+</code></pre>
+<p>只有这些事件中的 <code>type: &quot;command&quot;</code> hook 会被写入。<code>prompt</code>、<code>agent</code>、<code>http</code>、<code>async: true</code> 等都会跳过并标记人工复核。</p>
+<h3 id="matcher-规则">matcher 规则<a class="header-anchor" href="#matcher-规则">#</a></h3>
+<p>Codex 只对以下事件保留 matcher：</p>
+<pre><code class="language-text">PreToolUse
+PostToolUse
+SessionStart
+</code></pre>
+<p><code>UserPromptSubmit</code> 和 <code>Stop</code> 中的 matcher 会被忽略并标记人工复核。</p>
+<p>Claude <code>if</code> 条件不迁移。</p>
+<h3 id="运行时差异">运行时差异<a class="header-anchor" href="#运行时差异">#</a></h3>
+<p>hooks 是高风险迁移面。即使成功生成 <code>.codex/hooks.json</code>，也不能代表行为等价。</p>
+<p>重要差异：</p>
+<ol>
+<li>Codex hooks 需要显式开启 <code>[features].codex_hooks = true</code>。</li>
+<li>当前 Codex <code>PreToolUse</code> / <code>PostToolUse</code> 主要面向 shell command。</li>
+<li>Claude 的一些生命周期事件没有 Codex 等价项。</li>
+<li><code>Notification</code> 不等于 Codex <code>notify</code>，迁移器不会直接转换。</li>
+<li>async、HTTP、agent/prompt 类型 hooks 不自动迁移。</li>
+</ol>
+<h2 id="5-subagents">5. Subagents<a class="header-anchor" href="#5-subagents">#</a></h2>
+<h3 id="支持的来源-4">支持的来源<a class="header-anchor" href="#支持的来源-4">#</a></h3>
+<pre><code class="language-text">.claude/agents/*.md
+</code></pre>
+<p>目标：</p>
+<pre><code class="language-text">.codex/agents/*.toml
+</code></pre>
+<h3 id="基本转换">基本转换<a class="header-anchor" href="#基本转换">#</a></h3>
+<p>Claude subagent frontmatter 和 body 会转成 Codex custom agent TOML：</p>
+<pre><code class="language-toml">name = &quot;...&quot;
+description = &quot;...&quot;
+model = &quot;...&quot;
+model_reasoning_effort = &quot;...&quot;
+sandbox_mode = &quot;workspace-write&quot;
+developer_instructions = &quot;&quot;&quot;...&quot;&quot;&quot;
+</code></pre>
+<p>如果缺少 <code>name</code>，迁移器从文件名推断。</p>
+<p>如果缺少 <code>description</code>，迁移器从第一个 Markdown heading 或文件名推断。</p>
+<p>这些推断字段会被纳入人工复核。</p>
+<h3 id="模型映射">模型映射<a class="header-anchor" href="#模型映射">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Claude 模型前缀</th>
+<th>Codex 模型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>claude-opus</code></td>
+<td><code>gpt-5.4</code></td>
+</tr>
+<tr>
+<td><code>claude-sonnet</code></td>
+<td><code>gpt-5.4-mini</code></td>
+</tr>
+<tr>
+<td><code>claude-haiku</code></td>
+<td><code>gpt-5.4-mini</code></td>
+</tr>
+</tbody>
+</table>
+<p>effort 映射：</p>
+<table>
+<thead>
+<tr>
+<th>Claude family</th>
+<th>low</th>
+<th>medium</th>
+<th>high</th>
+<th>max</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>opus</td>
+<td>low</td>
+<td>medium</td>
+<td>high</td>
+<td>xhigh</td>
+</tr>
+<tr>
+<td>sonnet</td>
+<td>medium</td>
+<td>high</td>
+<td>xhigh</td>
+<td>xhigh</td>
+</tr>
+<tr>
+<td>haiku</td>
+<td>low</td>
+<td>medium</td>
+<td>high</td>
+<td>xhigh</td>
+</tr>
+</tbody>
+</table>
+<p>sonnet 被整体提高一个 reasoning tier，是为了更贴近 coding-agent 场景。</p>
+<h3 id="权限映射">权限映射<a class="header-anchor" href="#权限映射">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Claude <code>permissionMode</code></th>
+<th>Codex <code>sandbox_mode</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>acceptEdits</code></td>
+<td><code>workspace-write</code></td>
+</tr>
+<tr>
+<td><code>readOnly</code></td>
+<td><code>read-only</code></td>
+</tr>
+</tbody>
+</table>
+<p>其他 <code>permissionMode</code> 不自动映射，会进入 <code>MANUAL MIGRATION REQUIRED</code>。</p>
+<h3 id="prompt-guidance-保留">prompt guidance 保留<a class="header-anchor" href="#prompt-guidance-保留">#</a></h3>
+<p>Claude subagent 的以下字段不能作为硬权限迁移：</p>
+<pre><code class="language-text">skills
+tools
+disallowedTools
+</code></pre>
+<p>迁移器会把它们写入 <code>developer_instructions</code> 中，作为 prompt guidance。例如：</p>
+<pre><code class="language-text">You're allowed to use these tools:
+- Read
 
-<h3>Skills 与 Slash Commands</h3>
-<p>Claude skills 会转成 <code>.agents/skills/&lt;name&gt;/SKILL.md</code>。目录型 skill 会复制 <code>scripts/</code>、<code>references/</code>、<code>assets/</code>。Claude <code>allowed-tools</code> 会作为提示文字保留，但不是 Codex 权限边界。</p>
-<p>slash command 会转成 <code>source-command-*</code> skill，并保留原始 command template。<code>$ARGUMENTS</code>、<code>$1</code>、<code>{{name}}</code>、shell 输出插值和 <code>@path</code> 文件引用都会被标记为人工复核。</p>
-
-<h3>MCP 与 Config</h3>
-<p><code>.mcp.json</code> / <code>.claude.json</code> 中的 <code>mcpServers</code> 会写入 <code>.codex/config.toml</code>。headers 和 env 会尽量转成 Codex 的 <code>bearer_token_env_var</code>、<code>env_http_headers</code>、<code>http_headers</code>、<code>env_vars</code> 和 <code>env</code>。</p>
-<p>只要生成 config，迁移器会加入 <code>personality = "friendly"</code>，以保留接近 Claude Code 的交互风格。</p>
-
-<h3>Hooks</h3>
-<p>只转换 <code>PreToolUse</code>、<code>PostToolUse</code>、<code>SessionStart</code>、<code>UserPromptSubmit</code>、<code>Stop</code> 中的 command hooks。迁移结果写入 <code>.codex/hooks.json</code>，同时在 config 中启用 <code>[features].codex_hooks = true</code>。这是高风险迁移面，因为 Codex hook runtime 和 Claude 不等价。</p>
-
-<h3>Subagents</h3>
-<p><code>.claude/agents/*.md</code> 会转成 <code>.codex/agents/*.toml</code>。<code>name</code>、<code>description</code>、<code>model</code>、<code>effort</code>、部分 <code>permissionMode</code> 会被结构化映射；<code>skills</code>、<code>tools</code>、<code>disallowedTools</code> 会写入 <code>developer_instructions</code>，但只是 prompt guidance。</p>
-
-<h3>Plugins</h3>
-<p>插件只报告，不自动迁移。原因是 Claude plugins 可能包含 commands、agents、MCP、skills、hooks、marketplaces、output styles 和 provider-specific metadata，不能安全复制为 Codex plugin。</p>
-
-<h2>命令与推荐流程</h2>
-<pre><code>MIGRATE_TO_CODEX='python3 .codex/skills/migrate-to-codex/scripts/migrate-to-codex.py'
-
-$MIGRATE_TO_CODEX --source ~/.claude/ --scan-only
+Don't use these tools:
+- Bash
+</code></pre>
+<p>但这不是 Codex 的权限边界。若需要硬限制，需要人工配置 sandbox、permissions、MCP tool filters 或 app tool filters。</p>
+<h3 id="不支持或高风险项">不支持或高风险项<a class="header-anchor" href="#不支持或高风险项">#</a></h3>
+<p>包括：</p>
+<pre><code class="language-text">mcpServers
+hooks
+memory
+background
+isolation
+maxTurns
+initialPrompt
+</code></pre>
+<p>这些行为和 Codex custom-agent 的运行模型不等价，迁移器不会自动转换。</p>
+<h2 id="6-plugins">6. Plugins<a class="header-anchor" href="#6-plugins">#</a></h2>
+<h3 id="支持的来源-5">支持的来源<a class="header-anchor" href="#支持的来源-5">#</a></h3>
+<p>迁移器会检测：</p>
+<pre><code class="language-text">.claude/plugins
+.claude/plugin-marketplaces.json
+.claude-plugin/marketplace.json
+</code></pre>
+<h3 id="转换策略-1">转换策略<a class="header-anchor" href="#转换策略-1">#</a></h3>
+<p>插件不自动迁移，只生成 manual review 报告项。</p>
+<p>原因是 Claude Code plugins 可能包含：</p>
+<ol>
+<li>commands</li>
+<li>agents</li>
+<li>MCP servers</li>
+<li>skills</li>
+<li>hooks</li>
+<li>marketplaces</li>
+<li>output styles</li>
+<li>provider-specific metadata</li>
+</ol>
+<p>Codex plugin 的结构和 manifest 不同，不能安全复制目录树。</p>
+<h2 id="命令与工作流">命令与工作流<a class="header-anchor" href="#命令与工作流">#</a></h2>
+<p>入口命令：</p>
+<pre><code class="language-bash">python3 /Users/panbk/.codex/skills/migrate-to-codex/scripts/migrate-to-codex.py
+</code></pre>
+<p>常用变量：</p>
+<pre><code class="language-bash">MIGRATE_TO_CODEX='python3 .codex/skills/migrate-to-codex/scripts/migrate-to-codex.py'
+</code></pre>
+<h3 id="推荐迁移顺序">推荐迁移顺序<a class="header-anchor" href="#推荐迁移顺序">#</a></h3>
+<pre><code class="language-bash">$MIGRATE_TO_CODEX --source ~/.claude/ --scan-only
 $MIGRATE_TO_CODEX --source ~/.claude/ --target ~/.codex/ --plan
 $MIGRATE_TO_CODEX --source ~/.claude/ --target ~/.codex/ --doctor
 $MIGRATE_TO_CODEX --source ~/.claude/ --target ~/.codex/ --dry-run
 $MIGRATE_TO_CODEX --source ~/.claude/ --target ~/.codex/
-$MIGRATE_TO_CODEX --validate-target ~/.codex/</code></pre>
-
-<p>项目级迁移可使用：</p>
-<pre><code>$MIGRATE_TO_CODEX --source ./.claude/ --target ./.codex/ --dry-run
+$MIGRATE_TO_CODEX --validate-target ~/.codex/
+</code></pre>
+<p>项目级迁移：</p>
+<pre><code class="language-bash">$MIGRATE_TO_CODEX --source ./.claude/ --target ./.codex/ --dry-run
 $MIGRATE_TO_CODEX --source ./.claude/ --target ./.codex/
-$MIGRATE_TO_CODEX --validate-target ./.codex/</code></pre>
-
-<h2>验证能力</h2>
-<p><code>--validate-target</code> 是静态验证，不是运行时验证。它检查 TOML 是否可解析、MCP command 是否在 PATH 上、skill frontmatter 是否有 <code>name</code> 和 <code>description</code>、agent TOML 是否有必需字段、<code>AGENTS.md</code> 是否超过 32KB review threshold。</p>
-<div class="note">它不能证明 MCP server 一定能启动、hooks 行为与 Claude 等价、slash command 迁移后的 skill 可按原方式调用、子代理权限被硬性限制，或插件已经完成迁移。</div>
-
-<h2>核心策略总结</h2>
-<ol>
-<li>能结构化转换的就生成 Codex 原生文件。</li>
-<li>语义不等价时保留提示，但标记人工复核。</li>
-<li>高风险 provider runtime 行为不假装迁移成功。</li>
-<li>先计划，后写入，通过 <code>ConversionResult</code> 与 <code>DeploymentPlan</code> 分离转换和部署。</li>
-<li>报告驱动自愈：修复 <code>MANUAL MIGRATION REQUIRED</code> 后重新验证。</li>
-</ol>
-
-<h2>设计优点与局限</h2>
+$MIGRATE_TO_CODEX --validate-target ./.codex/
+</code></pre>
+<p>只迁移部分组件：</p>
+<pre><code class="language-bash">$MIGRATE_TO_CODEX --source ./.claude/ --target ./.codex/ --skills
+$MIGRATE_TO_CODEX --source ./.claude/ --target ./.codex/ --mcp
+$MIGRATE_TO_CODEX --source ./.claude/ --target ./.codex/ --subagents
+</code></pre>
+<p>默认不传组件参数时迁移：</p>
+<pre><code class="language-text">mcp
+skills
+subagents
+</code></pre>
+<p>instructions、hooks、plugins 的报告/转换由 scope 转换流程处理，不属于 <code>DEFAULT_COMPONENTS</code> 的选择集。</p>
+<h2 id="验证能力">验证能力<a class="header-anchor" href="#验证能力">#</a></h2>
+<p><code>--validate-target</code> 做的是静态验证，不是运行时验证。</p>
+<p>检查内容：</p>
 <table>
-<thead><tr><th>优点</th><th>局限</th></tr></thead>
+<thead>
+<tr>
+<th>目标</th>
+<th>验证</th>
+</tr>
+</thead>
 <tbody>
-<tr><td>边界清晰：可迁移、部分迁移、不能迁移分别处理。</td><td>不是语义等价迁移器，不能证明运行时行为一致。</td></tr>
-<tr><td>可审计：artifact 和 report item 都可追踪。</td><td>YAML 解析是简化实现，不是完整 YAML parser。</td></tr>
-<tr><td>安全默认：默认 merge，不删除旧 artifact。</td><td>MCP JSON 使用 <code>json.loads</code>，注释或 trailing comma 可能失败。</td></tr>
-<tr><td>保留上下文：不支持字段不会静默丢失。</td><td>权限和 hooks 迁移存在明显语义差异。</td></tr>
-<tr><td>模块化：每类迁移面独立，便于扩展。</td><td>plugins 只报告，不自动迁移。</td></tr>
+<tr>
+<td><code>.codex/config.toml</code></td>
+<td>TOML 可解析。</td>
+</tr>
+<tr>
+<td>MCP command</td>
+<td>command 是否在 <code>PATH</code> 上。</td>
+</tr>
+<tr>
+<td><code>.agents/skills/*/SKILL.md</code></td>
+<td>frontmatter 是否有 <code>name</code> 和 <code>description</code>。</td>
+</tr>
+<tr>
+<td><code>.codex/agents/*.toml</code></td>
+<td>TOML 可解析，且有 <code>name</code>、<code>description</code>、<code>developer_instructions</code>。</td>
+</tr>
+<tr>
+<td><code>AGENTS.md</code></td>
+<td>文件大小是否低于 32KB review threshold。</td>
+</tr>
 </tbody>
 </table>
-
-<h2>实践建议</h2>
-<p>优先检查 <code>.codex/config.toml</code>、<code>.codex/hooks.json</code>、<code>.codex/agents/*.toml</code>、<code>.agents/skills/source-command-*/SKILL.md</code>、所有 <code>MANUAL MIGRATION REQUIRED</code> 和 <code>.codex/migrate-to-codex-report.txt</code>。</p>
-<p>只有在确认目标 Codex skills / agents 中没有手工维护内容，并且希望目标与源映射结果保持同步时，才使用 <code>--replace</code>。否则使用默认 <code>merge</code>。</p>
-
-<h2>结论</h2>
-<p><code>migrate-to-codex</code> 的核心思想是：不要把跨 agent 平台迁移伪装成简单文件复制。它把能安全映射的部分落到 Codex 原生文件中；对不能安全映射的部分，保留上下文、写入人工复核块、生成报告，并要求验证。</p>
-<pre><code>scan -> plan -> doctor -> dry-run -> migrate -> review manual blocks -> validate -> runtime test</code></pre>
-<p>它的最佳定位是迁移加速器和迁移审计器，而不是完全自动兼容层。</p>
+<p>这不能证明：</p>
+<ol>
+<li>MCP server 一定能启动。</li>
+<li>hooks 行为与 Claude 等价。</li>
+<li>slash command 迁移后的 skill 可按原方式调用。</li>
+<li>子代理权限被硬性限制。</li>
+<li>插件完成迁移。</li>
+</ol>
+<h2 id="核心策略总结">核心策略总结<a class="header-anchor" href="#核心策略总结">#</a></h2>
+<h3 id="策略-1能结构化转换的就生成-codex-原生文件">策略 1：能结构化转换的就生成 Codex 原生文件<a class="header-anchor" href="#策略-1能结构化转换的就生成-codex-原生文件">#</a></h3>
+<p>例如：</p>
+<ol>
+<li><code>.mcp.json</code> -&gt; <code>.codex/config.toml</code></li>
+<li><code>.claude/agents/*.md</code> -&gt; <code>.codex/agents/*.toml</code></li>
+<li><code>.claude/skills/*</code> -&gt; <code>.agents/skills/*</code></li>
+</ol>
+<h3 id="策略-2语义不等价时保留提示但标记人工复核">策略 2：语义不等价时保留提示，但标记人工复核<a class="header-anchor" href="#策略-2语义不等价时保留提示但标记人工复核">#</a></h3>
+<p>例如：</p>
+<ol>
+<li><code>allowed-tools</code></li>
+<li>slash command 参数展开</li>
+<li>shell interpolation</li>
+<li>agent tool allow/deny</li>
+<li>unsupported MCP 字段</li>
+</ol>
+<p>这些会进入 <code>MANUAL MIGRATION REQUIRED</code> 或 report item。</p>
+<h3 id="策略-3高风险-provider-runtime-行为不假装迁移成功">策略 3：高风险 provider runtime 行为不假装迁移成功<a class="header-anchor" href="#策略-3高风险-provider-runtime-行为不假装迁移成功">#</a></h3>
+<p>例如：</p>
+<ol>
+<li>plugins</li>
+<li>async hooks</li>
+<li>HTTP hooks</li>
+<li>Notification hooks</li>
+<li>subagent background/isolation/maxTurns</li>
+<li>source provider 的 marketplace</li>
+</ol>
+<p>迁移器只报告，不自动复制。</p>
+<h3 id="策略-4先计划后写入">策略 4：先计划，后写入<a class="header-anchor" href="#策略-4先计划后写入">#</a></h3>
+<p>所有转换先生成 <code>ConversionResult</code> 和 <code>DeploymentPlan</code>，再由部署阶段统一写文件。这样可以支持：</p>
+<ol>
+<li><code>--plan</code></li>
+<li><code>--doctor</code></li>
+<li><code>--dry-run</code></li>
+<li>collision 检测</li>
+<li>orphan cleanup</li>
+<li>migration report 写入</li>
+</ol>
+<h3 id="策略-5报告驱动的自愈循环">策略 5：报告驱动的自愈循环<a class="header-anchor" href="#策略-5报告驱动的自愈循环">#</a></h3>
+<p><code>SKILL.md</code> 要求 agent 按循环处理：</p>
+<ol>
+<li><code>--plan</code> 或 <code>--doctor</code></li>
+<li><code>--dry-run</code></li>
+<li>正式迁移</li>
+<li>修复生成文件中的 <code>MANUAL MIGRATION REQUIRED</code></li>
+<li><code>--validate-target</code></li>
+<li>重新运行迁移器与 validator，直到没有可处理的 generated-artifact 问题</li>
+</ol>
+<h2 id="可适配内容范围">可适配内容范围<a class="header-anchor" href="#可适配内容范围">#</a></h2>
+<h3 id="自动化程度较高">自动化程度较高<a class="header-anchor" href="#自动化程度较高">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>内容</th>
+<th>适配程度</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>provider-neutral instructions</td>
+<td>高</td>
+<td>可 symlink 到 <code>AGENTS.md</code>。</td>
+</tr>
+<tr>
+<td>普通 Claude skills</td>
+<td>高</td>
+<td>prompt 与支持目录可迁移。</td>
+</tr>
+<tr>
+<td>MCP stdio/http 基础配置</td>
+<td>中高</td>
+<td>command、args、url、env、headers 可迁移。</td>
+</tr>
+<tr>
+<td>基础 subagent prompt</td>
+<td>中高</td>
+<td>可转为 Codex custom-agent TOML。</td>
+</tr>
+<tr>
+<td>model / effort</td>
+<td>中</td>
+<td>按模型族做启发式映射。</td>
+</tr>
+<tr>
+<td><code>acceptEdits</code> / <code>readOnly</code></td>
+<td>中</td>
+<td>可映射为 Codex sandbox。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="需要人工复核">需要人工复核<a class="header-anchor" href="#需要人工复核">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>内容</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>slash commands</td>
+<td>参数、模板、文件引用、shell 插值运行时不等价。</td>
+</tr>
+<tr>
+<td><code>allowed-tools</code></td>
+<td>Codex skill 没有同等硬权限字段。</td>
+</tr>
+<tr>
+<td>subagent <code>tools</code> / <code>disallowedTools</code></td>
+<td>只能保留为 prompt guidance。</td>
+</tr>
+<tr>
+<td>subagent <code>skills</code></td>
+<td>Codex 没有相同的 spawn-time preload 语义。</td>
+</tr>
+<tr>
+<td>hooks</td>
+<td>生命周期和匹配范围不同。</td>
+</tr>
+<tr>
+<td>MCP auth fallback</td>
+<td><code>${VAR:-default}</code> default 语义不保留。</td>
+</tr>
+<tr>
+<td>instruction 中 Claude-only 描述</td>
+<td>需要人工改写为 Codex 语义。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="不自动迁移">不自动迁移<a class="header-anchor" href="#不自动迁移">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>内容</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Claude plugins</td>
+<td>Codex plugin manifest 和布局不同。</td>
+</tr>
+<tr>
+<td>plugin marketplaces</td>
+<td>不自动 fetch、install 或转换 marketplace。</td>
+</tr>
+<tr>
+<td>unsupported hook events</td>
+<td>Codex 没有对应生命周期。</td>
+</tr>
+<tr>
+<td>HTTP/prompt/agent/async hooks</td>
+<td>当前转换器只写 command hooks。</td>
+</tr>
+<tr>
+<td>subagent background/isolation/maxTurns</td>
+<td>Codex custom-agent 文件不表达等价运行模型。</td>
+</tr>
+<tr>
+<td><code>.claude/settings.local.json</code> 的 local-only 语义</td>
+<td>Codex 项目配置信任模型不同。</td>
+</tr>
+</tbody>
+</table>
+<h2 id="迁移报告语义">迁移报告语义<a class="header-anchor" href="#迁移报告语义">#</a></h2>
+<p>报告项常见 status：</p>
+<table>
+<thead>
+<tr>
+<th>status</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rewritten</code></td>
+<td>已生成或重写 Codex-facing artifact。</td>
+</tr>
+<tr>
+<td><code>manual_fix_required</code></td>
+<td>已生成或发现相关内容，但需要人工复核。</td>
+</tr>
+<tr>
+<td><code>symlinked</code></td>
+<td>目标通过 symlink 连接到源文件。</td>
+</tr>
+<tr>
+<td><code>overwritten</code></td>
+<td>目标已有 Codex artifact，将被覆盖。</td>
+</tr>
+<tr>
+<td><code>would_delete</code> / <code>deleted</code></td>
+<td><code>--replace</code> 下孤儿 artifact 将被或已被删除。</td>
+</tr>
+<tr>
+<td><code>ok</code></td>
+<td>validator 检查通过。</td>
+</tr>
+<tr>
+<td><code>warning</code></td>
+<td>validator 或报告发现非致命风险。</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td>validator 发现格式或必需字段错误。</td>
+</tr>
+</tbody>
+</table>
+<p>正式迁移后报告写入：</p>
+<pre><code class="language-text">.codex/migrate-to-codex-report.txt
+</code></pre>
+<h2 id="设计优点">设计优点<a class="header-anchor" href="#设计优点">#</a></h2>
+<ol>
+<li><strong>边界清晰</strong>：能迁移、部分迁移、不能迁移分别处理。</li>
+<li><strong>可审计</strong>：每个 artifact 和 report item 都可追踪。</li>
+<li><strong>安全默认</strong>：默认 merge，不删除未计划的旧 artifact。</li>
+<li><strong>格式验证</strong>：至少能发现 TOML、frontmatter、必需字段问题。</li>
+<li><strong>保留上下文</strong>：不支持字段不会静默丢失，而是变成人工复核提示。</li>
+<li><strong>模块化</strong>：每类迁移面有独立模块，扩展成本较低。</li>
+</ol>
+<h2 id="设计局限">设计局限<a class="header-anchor" href="#设计局限">#</a></h2>
+<ol>
+<li><strong>不是语义等价迁移器</strong>：无法证明运行时行为一致。</li>
+<li><strong>YAML 解析是简化实现</strong>：只覆盖 frontmatter 常见子集，不是完整 YAML parser。</li>
+<li><strong>MCP JSON 读取不统一支持 JSONC</strong>：settings 读取支持 JSONC，但 <code>.mcp.json</code> / <code>.claude.json</code> 使用 <code>json.loads</code>，注释或 trailing comma 可能失败。</li>
+<li><strong>权限迁移偏提示化</strong>：很多 Claude 权限字段只能放入 prompt guidance。</li>
+<li><strong>hooks 迁移风险高</strong>：Codex hook runtime 范围和 Claude 不同。</li>
+<li><strong>plugins 只报告</strong>：插件体系需要人工迁移。</li>
+<li><strong>validation 是静态的</strong>：不能替代真实运行测试。</li>
+</ol>
+<h2 id="实践建议">实践建议<a class="header-anchor" href="#实践建议">#</a></h2>
+<h3 id="推荐使用方式">推荐使用方式<a class="header-anchor" href="#推荐使用方式">#</a></h3>
+<ol>
+<li>先只跑 <code>--scan-only</code> 了解资产范围。</li>
+<li>再跑 <code>--plan</code> 看会生成哪些文件。</li>
+<li>用 <code>--doctor</code> 判断人工复核量和风险。</li>
+<li>用 <code>--dry-run</code> 看完整报告。</li>
+<li>正式迁移后，先读 <code>.codex/migrate-to-codex-report.txt</code>。</li>
+<li>逐个搜索 <code>MANUAL MIGRATION REQUIRED</code>。</li>
+<li>修复后运行 <code>--validate-target</code>。</li>
+<li>对 MCP、hooks、subagents 做实际运行验证。</li>
+</ol>
+<h3 id="复核重点">复核重点<a class="header-anchor" href="#复核重点">#</a></h3>
+<p>优先检查这些内容：</p>
+<ol>
+<li><code>.codex/config.toml</code></li>
+<li><code>.codex/hooks.json</code></li>
+<li><code>.codex/agents/*.toml</code></li>
+<li><code>.agents/skills/source-command-*/SKILL.md</code></li>
+<li>所有 <code>MANUAL MIGRATION REQUIRED</code></li>
+<li><code>.codex/migrate-to-codex-report.txt</code></li>
+</ol>
+<h3 id="何时用-replace">何时用 <code>--replace</code><a class="header-anchor" href="#何时用-replace">#</a></h3>
+<p>只有在你明确希望目标 Codex skills / agents 与源 Claude assets 保持同步，并且确认目标中没有手工维护的 Codex artifact 时，才使用 <code>--replace</code>。</p>
+<p>否则使用默认 <code>merge</code>。</p>
+<h2 id="结论">结论<a class="header-anchor" href="#结论">#</a></h2>
+<p><code>migrate-to-codex</code> 的核心思想是：不要把跨 agent 平台迁移伪装成简单文件复制。它通过静态转换把能安全映射的部分落到 Codex 原生文件中；对不能安全映射的部分，保留上下文、写入人工复核块、生成报告，并要求验证。</p>
+<p>它的最佳定位是“迁移加速器”和“迁移审计器”，不是“完全自动兼容层”。真正可靠的迁移流程应当是：</p>
+<pre><code class="language-text">scan -&gt; plan -&gt; doctor -&gt; dry-run -&gt; migrate -&gt; review manual blocks -&gt; validate -&gt; runtime test
+</code></pre>
+<p>只要按这个流程使用，它可以显著减少重复迁移工作，同时避免把 Claude Code 运行时语义误带入 Codex。</p>
+  </div>
+  <footer class="doc-footer">
+    <div>源文件：<code>knowledge/codex/migrate-analysis.md</code></div>
+    <div>生成于：2026-05-20 03:06</div>
+  </footer>
 </article>
+<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#一句话定位">一句话定位</a></li>
+<li class="toc-l2"><a href="#目的与作用">目的与作用</a></li>
+<li class="toc-l3"><a href="#主要目的">主要目的</a></li>
+<li class="toc-l3"><a href="#实际价值">实际价值</a></li>
+<li class="toc-l2"><a href="#总体架构">总体架构</a></li>
+<li class="toc-l3"><a href="#模块职责">模块职责</a></li>
+<li class="toc-l2"><a href="#底层实现原理">底层实现原理</a></li>
+<li class="toc-l3"><a href="#1-迁移面抽象">1. 迁移面抽象</a></li>
+<li class="toc-l3"><a href="#2-artifact-模型">2. Artifact 模型</a></li>
+<li class="toc-l3"><a href="#3-扫描规划部署分离">3. 扫描、规划、部署分离</a></li>
+<li class="toc-l3"><a href="#4-scope-处理">4. Scope 处理</a></li>
+<li class="toc-l3"><a href="#5-merge-与-replace-策略">5. merge 与 replace 策略</a></li>
+<li class="toc-l2"><a href="#各内容范围与转换策略">各内容范围与转换策略</a></li>
+<li class="toc-l2"><a href="#1-instructions">1. Instructions</a></li>
+<li class="toc-l3"><a href="#支持的来源">支持的来源</a></li>
+<li class="toc-l3"><a href="#转换策略">转换策略</a></li>
+<li class="toc-l3"><a href="#设计思路">设计思路</a></li>
+<li class="toc-l2"><a href="#2-skills-与-slash-commands">2. Skills 与 Slash Commands</a></li>
+<li class="toc-l3"><a href="#支持的来源-1">支持的来源</a></li>
+<li class="toc-l3"><a href="#skill-转换">Skill 转换</a></li>
+<li class="toc-l3"><a href="#slash-command-转换">Slash Command 转换</a></li>
+<li class="toc-l3"><a href="#设计思路-1">设计思路</a></li>
+<li class="toc-l2"><a href="#3-mcp-与-codexconfigtoml">3. MCP 与 .codex/config.toml</a></li>
+<li class="toc-l3"><a href="#支持的来源-2">支持的来源</a></li>
+<li class="toc-l3"><a href="#迁移内容">迁移内容</a></li>
+<li class="toc-l3"><a href="#mcp-headers-与-env-映射">MCP headers 与 env 映射</a></li>
+<li class="toc-l3"><a href="#mcp-限制">MCP 限制</a></li>
+<li class="toc-l2"><a href="#4-hooks">4. Hooks</a></li>
+<li class="toc-l3"><a href="#支持的来源-3">支持的来源</a></li>
+<li class="toc-l3"><a href="#支持的事件">支持的事件</a></li>
+<li class="toc-l3"><a href="#matcher-规则">matcher 规则</a></li>
+<li class="toc-l3"><a href="#运行时差异">运行时差异</a></li>
+<li class="toc-l2"><a href="#5-subagents">5. Subagents</a></li>
+<li class="toc-l3"><a href="#支持的来源-4">支持的来源</a></li>
+<li class="toc-l3"><a href="#基本转换">基本转换</a></li>
+<li class="toc-l3"><a href="#模型映射">模型映射</a></li>
+<li class="toc-l3"><a href="#权限映射">权限映射</a></li>
+<li class="toc-l3"><a href="#prompt-guidance-保留">prompt guidance 保留</a></li>
+<li class="toc-l3"><a href="#不支持或高风险项">不支持或高风险项</a></li>
+<li class="toc-l2"><a href="#6-plugins">6. Plugins</a></li>
+<li class="toc-l3"><a href="#支持的来源-5">支持的来源</a></li>
+<li class="toc-l3"><a href="#转换策略-1">转换策略</a></li>
+<li class="toc-l2"><a href="#命令与工作流">命令与工作流</a></li>
+<li class="toc-l3"><a href="#推荐迁移顺序">推荐迁移顺序</a></li>
+<li class="toc-l2"><a href="#验证能力">验证能力</a></li>
+<li class="toc-l2"><a href="#核心策略总结">核心策略总结</a></li>
+<li class="toc-l3"><a href="#策略-1能结构化转换的就生成-codex-原生文件">策略 1：能结构化转换的就生成 Codex 原生文件</a></li>
+<li class="toc-l3"><a href="#策略-2语义不等价时保留提示但标记人工复核">策略 2：语义不等价时保留提示，但标记人工复核</a></li>
+<li class="toc-l3"><a href="#策略-3高风险-provider-runtime-行为不假装迁移成功">策略 3：高风险 provider runtime 行为不假装迁移成功</a></li>
+<li class="toc-l3"><a href="#策略-4先计划后写入">策略 4：先计划，后写入</a></li>
+<li class="toc-l3"><a href="#策略-5报告驱动的自愈循环">策略 5：报告驱动的自愈循环</a></li>
+<li class="toc-l2"><a href="#可适配内容范围">可适配内容范围</a></li>
+<li class="toc-l3"><a href="#自动化程度较高">自动化程度较高</a></li>
+<li class="toc-l3"><a href="#需要人工复核">需要人工复核</a></li>
+<li class="toc-l3"><a href="#不自动迁移">不自动迁移</a></li>
+<li class="toc-l2"><a href="#迁移报告语义">迁移报告语义</a></li>
+<li class="toc-l2"><a href="#设计优点">设计优点</a></li>
+<li class="toc-l2"><a href="#设计局限">设计局限</a></li>
+<li class="toc-l2"><a href="#实践建议">实践建议</a></li>
+<li class="toc-l3"><a href="#推荐使用方式">推荐使用方式</a></li>
+<li class="toc-l3"><a href="#复核重点">复核重点</a></li>
+<li class="toc-l3"><a href="#何时用-replace">何时用 --replace</a></li>
+<li class="toc-l2"><a href="#结论">结论</a></li></ol></div></details></aside>
 </main>
+<script>
+(function () {
+  document.querySelectorAll('pre > code').forEach(function (codeEl) {
+    var pre = codeEl.parentElement;
+    if (!pre || pre.parentElement.classList.contains('code-wrap')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'code-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.type = 'button';
+    btn.textContent = '复制';
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(codeEl.innerText).then(function () {
+        btn.textContent = '已复制';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          btn.textContent = '复制';
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
 </body>
 </html>

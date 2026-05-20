@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex 本地会话文件结构与统计口径</title>
+  <style>
+:root {
+  color-scheme: light;
+  --bg: #f7f8fb;
+  --paper: #ffffff;
+  --text: #1f2937;
+  --text-strong: #111827;
+  --muted: #667085;
+  --line: #d9dee8;
+  --accent: #0f766e;
+  --accent-soft: #eef6f5;
+  --accent-deep: #134e4a;
+  --warn: #7c2d12;
+  --code-bg: #f1f5f9;
+  --code-block-bg: #0f172a;
+  --code-block-fg: #e5e7eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 16px;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.68;
+}
+
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 32px;
+  align-items: start;
+}
+
+main.no-toc {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1000px;
+}
+
+article {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 42px 48px;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.05);
+  min-width: 0;
+}
+
+/* Header block */
+.doc-header h1 {
+  margin: 0 0 12px;
+  font-size: 32px;
+  line-height: 1.25;
+  color: var(--text-strong);
+}
+
+.doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.doc-meta .date {
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-meta .sep {
+  color: var(--line);
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.status {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.status-complete { background: #dcfce7; color: #166534; }
+.status-wip      { background: #fef3c7; color: #92400e; }
+.status-draft    { background: #e5e7eb; color: #4b5563; }
+
+.doc-meta-extra {
+  background: var(--accent-soft);
+  border: 1px solid #d6e9e7;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 20px;
+  color: var(--accent-deep);
+  font-size: 14px;
+}
+.doc-meta-extra dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.doc-meta-extra dt {
+  font-weight: 500;
+}
+.doc-meta-extra dd {
+  margin: 0;
+}
+
+.lead {
+  font-size: 17px;
+  color: #243041;
+  border-left: 4px solid var(--accent);
+  padding: 4px 0 4px 14px;
+  margin: 16px 0 28px;
+}
+
+/* Headings inside body */
+.doc-body h2 {
+  margin: 38px 0 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 23px;
+  line-height: 1.3;
+  color: var(--text-strong);
+  scroll-margin-top: 16px;
+}
+.doc-body h3 {
+  margin: 26px 0 10px;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--accent-deep);
+  scroll-margin-top: 16px;
+}
+.doc-body h4 {
+  margin: 20px 0 8px;
+  font-size: 16px;
+  color: var(--text-strong);
+}
+
+.doc-body h2 .header-anchor,
+.doc-body h3 .header-anchor,
+.doc-body h4 .header-anchor {
+  margin-left: 8px;
+  color: var(--line);
+  text-decoration: none;
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.doc-body h2:hover .header-anchor,
+.doc-body h3:hover .header-anchor,
+.doc-body h4:hover .header-anchor {
+  opacity: 1;
+}
+
+/* Text content */
+.doc-body p { margin: 10px 0; }
+.doc-body ul, .doc-body ol { margin: 8px 0 16px 24px; padding: 0; }
+.doc-body li { margin: 4px 0; }
+.doc-body li > p { margin: 4px 0; }
+
+.doc-body blockquote {
+  border-left: 4px solid var(--line);
+  padding: 4px 0 4px 14px;
+  margin: 14px 0;
+  color: var(--muted);
+}
+
+.doc-body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 24px 0;
+}
+
+/* Inline code & code blocks */
+.doc-body code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.code-wrap {
+  position: relative;
+  margin: 14px 0;
+}
+.code-wrap pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--code-block-bg);
+  color: var(--code-block-fg);
+  line-height: 1.5;
+  font-size: 13.5px;
+}
+.code-wrap pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.code-wrap:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.copy-btn.copied { color: #86efac; }
+
+/* Tables */
+.doc-body table {
+  width: 100%;
+  margin: 14px 0 22px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.doc-body th, .doc-body td {
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  vertical-align: top;
+  text-align: left;
+}
+.doc-body th {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 500;
+}
+
+/* Admonitions (GitHub-style) */
+.admonition {
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 18px 0;
+  border: 1px solid;
+  background: #fff;
+}
+.admonition-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+.admonition-title::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.admonition > p:last-child { margin-bottom: 0; }
+.admonition > p:first-of-type { margin-top: 0; }
+
+.admonition.note      { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.admonition.tip       { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.admonition.important { background: #f5f3ff; border-color: #ddd6fe; color: #5b21b6; }
+.admonition.warning   { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.admonition.caution   { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+.admonition > p { color: var(--text); }
+
+/* Images */
+.doc-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+/* Links */
+.doc-body a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+.doc-body a:hover {
+  border-bottom-color: var(--accent);
+}
+
+/* TOC sidebar */
+aside.toc {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 16px 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+aside.toc .toc-title {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+aside.toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+aside.toc li { margin: 4px 0; }
+aside.toc a {
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border-left: 2px solid transparent;
+  line-height: 1.45;
+}
+aside.toc a:hover {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+aside.toc .toc-l3 a {
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Footer */
+.doc-footer {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.doc-footer code {
+  background: var(--code-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Narrow screens */
+@media (max-width: 980px) {
+  main {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px 12px 40px;
+  }
+  article {
+    padding: 24px 18px;
+  }
+  .doc-header h1 { font-size: 26px; }
+  .doc-body h2 { font-size: 20px; }
+  .doc-body table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  aside.toc {
+    position: static;
+    max-height: none;
+    order: -1;
+  }
+  aside.toc.collapsible {
+    padding: 0;
+  }
+  aside.toc.collapsible summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    list-style: none;
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  aside.toc.collapsible .toc-body {
+    padding: 0 16px 14px;
+  }
+  aside.toc.collapsible .toc-title { display: none; }
+}
+
+  </style>
+</head>
+<body>
+<main class="">
+<article>
+  <header class="doc-header">
+    <h1>Codex 本地会话文件结构与统计口径</h1>
+    <div class="doc-meta"><span class="date">2026-05-16</span>
+        <span class="tag-chip">codex</span>
+        <span class="tag-chip">claude-code</span>
+        <span class="tag-chip">会话</span>
+        <span class="status status-complete">complete</span></div>
+
+
+  </header>
+  <div class="doc-body">
+<p>日期：2026-05-16</p>
+<p>本文总结 Claude Code 和 Codex CLI 本地会话文件的组成、JSONL 记录类型，以及统计会话指标时的口径差异。重点说明两家 Token 报告语义的根本不同，以及如何在工具中统一展示。</p>
+<hr />
+<h2 id="1-文件位置与命名">1. 文件位置与命名<a class="header-anchor" href="#1-文件位置与命名">#</a></h2>
+<h3 id="claude-code">Claude Code<a class="header-anchor" href="#claude-code">#</a></h3>
+<pre><code class="language-text">~/.claude/projects/{project-slug}/{uuid}.jsonl
+</code></pre>
+<ul>
+<li><code>{project-slug}</code>：项目路径的编码形式，如 <code>-Users-panbk-Programmer-MyProject</code></li>
+<li><code>{uuid}.jsonl</code>：UUID 格式的文件名，即 native session ID，可用于 <code>claude --resume {uuid}</code></li>
+<li>跳过目录：<code>subagents/</code>、<code>memory/</code>、<code>worktrees/</code>、<code>node_modules/</code></li>
+<li>过滤条件：文件大小 ≥ 200 字节</li>
+</ul>
+<h3 id="codex-cli">Codex CLI<a class="header-anchor" href="#codex-cli">#</a></h3>
+<pre><code class="language-text">~/.codex/sessions/{year}/{month}/{day}/rollout-{timestamp}-{uuid}.jsonl
+</code></pre>
+<ul>
+<li>按日期目录组织</li>
+<li>文件名包含创建时间戳和 UUID</li>
+<li>一个 <code>.jsonl</code> 文件对应一个会话</li>
+</ul>
+<hr />
+<h2 id="2-jsonl-记录类型">2. JSONL 记录类型<a class="header-anchor" href="#2-jsonl-记录类型">#</a></h2>
+<h3 id="21-claude-code">2.1 Claude Code<a class="header-anchor" href="#21-claude-code">#</a></h3>
+<p>每行是一条独立 JSON 记录，顶层 <code>type</code> 字段决定语义。</p>
+<h4 id="可见消息类型">可见消息类型<a class="header-anchor" href="#可见消息类型">#</a></h4>
+<p><strong><code>user</code></strong> — 用户消息</p>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;user&quot;,
+  &quot;uuid&quot;: &quot;...&quot;,
+  &quot;sessionId&quot;: &quot;...&quot;,
+  &quot;timestamp&quot;: &quot;2026-05-16T01:00:00.000Z&quot;,
+  &quot;cwd&quot;: &quot;/path/to/project&quot;,
+  &quot;message&quot;: {
+    &quot;content&quot;: &quot;请帮我修复这个 bug&quot; | [
+      { &quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;...&quot; },
+      { &quot;type&quot;: &quot;tool_result&quot;, &quot;tool_use_id&quot;: &quot;toolu_xxx&quot;, &quot;content&quot;: &quot;...&quot; }
+    ]
+  }
+}
+</code></pre>
+<ul>
+<li><code>message.content</code> 可以是字符串或数组</li>
+<li>数组中可包含 <code>tool_result</code> 块（工具执行结果）</li>
+<li>常见顶层字段：<code>uuid</code>、<code>parentUuid</code>、<code>sessionId</code>、<code>cwd</code>、<code>gitBranch</code>、<code>entrypoint</code>、<code>version</code></li>
+</ul>
+<p><strong><code>assistant</code></strong> — 模型响应</p>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;assistant&quot;,
+  &quot;uuid&quot;: &quot;...&quot;,
+  &quot;timestamp&quot;: &quot;2026-05-16T01:00:01.000Z&quot;,
+  &quot;message&quot;: {
+    &quot;model&quot;: &quot;claude-sonnet-4-6&quot;,
+    &quot;content&quot;: [
+      { &quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;我来看看这个问题&quot; },
+      { &quot;type&quot;: &quot;tool_use&quot;, &quot;id&quot;: &quot;toolu_xxx&quot;, &quot;name&quot;: &quot;Bash&quot;, &quot;input&quot;: { &quot;command&quot;: &quot;pwd&quot;, &quot;description&quot;: &quot;...&quot; } },
+      { &quot;type&quot;: &quot;thinking&quot;, &quot;thinking&quot;: &quot;...&quot; }
+    ],
+    &quot;usage&quot;: {
+      &quot;input_tokens&quot;: 6,
+      &quot;output_tokens&quot;: 185,
+      &quot;cache_creation_input_tokens&quot;: 26222,
+      &quot;cache_read_input_tokens&quot;: 0
+    }
+  }
+}
+</code></pre>
+<ul>
+<li><code>message.model</code>：模型名称，如 <code>claude-opus-4-7</code>、<code>claude-sonnet-4-6</code>；值为 <code>&lt;synthetic&gt;</code> 时跳过</li>
+<li><code>message.content</code> 数组中的 block 类型：
+<ul>
+<li><code>text</code>：文本输出</li>
+<li><code>tool_use</code>：工具调用（包含 <code>name</code>、<code>id</code>、<code>input</code>）</li>
+<li><code>thinking</code>：思维链（不展示为可见消息）</li>
+</ul>
+</li>
+<li><code>message.usage</code>：Token 用量（<strong>关键差异点，见第 3 节</strong>）</li>
+<li>部分记录含 <code>message.usage.iterations[]</code>，其中的 token 值与顶层重复，不应重复计算</li>
+</ul>
+<p><strong>工具调用与结果的关系：</strong></p>
+<ul>
+<li><code>tool_use</code> 出现在 <code>assistant</code> 消息的 content 数组中</li>
+<li><code>tool_result</code> 出现在后续 <code>user</code> 消息的 content 数组中</li>
+<li>两者通过 <code>tool_use.id</code> / <code>tool_result.tool_use_id</code> 关联</li>
+</ul>
+<p><strong>Skill 和 Subagent 识别：</strong></p>
+<ul>
+<li>Skill：<code>tool_use</code> block 中 <code>name === &quot;Skill&quot;</code>，从 <code>input.skill</code> 提取技能名</li>
+<li>Subagent：<code>tool_use</code> block 中 <code>name === &quot;Agent&quot;</code>，从 <code>input.subagent_type</code> 提取子代理类型</li>
+</ul>
+<h4 id="系统消息类型">系统消息类型<a class="header-anchor" href="#系统消息类型">#</a></h4>
+<p><strong><code>system</code></strong> — 系统事件，由 <code>subtype</code> 区分</p>
+<pre><code class="language-json">{ &quot;type&quot;: &quot;system&quot;, &quot;subtype&quot;: &quot;turn_duration&quot;, &quot;durationMs&quot;: 39768, &quot;messageCount&quot;: 34, &quot;timestamp&quot;: &quot;...&quot; }
+</code></pre>
+<p>常见 subtype：</p>
+<ul>
+<li><code>turn_duration</code>：轮次耗时（<code>durationMs</code> 字段），是耗时统计的唯一来源</li>
+<li><code>stop_hook_summary</code>：hook 执行摘要</li>
+<li><code>away_summary</code>：离开摘要</li>
+<li><code>api_error</code>：API 错误</li>
+<li><code>compact_boundary</code>：上下文压缩边界</li>
+</ul>
+<h4 id="元数据类型不计入可见消息">元数据类型（不计入可见消息）<a class="header-anchor" href="#元数据类型不计入可见消息">#</a></h4>
+<p>以下类型在统计时完全跳过：</p>
+<ul>
+<li><code>permission-mode</code>：权限模式切换</li>
+<li><code>file-history-snapshot</code>：文件快照</li>
+<li><code>attachment</code>：附件</li>
+<li><code>ai-title</code>：AI 生成的标题</li>
+<li><code>last-prompt</code>：上次提示</li>
+<li><code>queue-operation</code>：队列操作</li>
+<li><code>summary</code>：摘要</li>
+<li><code>result</code>：结果</li>
+</ul>
+<h3 id="22-codex-cli">2.2 Codex CLI<a class="header-anchor" href="#22-codex-cli">#</a></h3>
+<p>每行是一条独立 JSON 记录，顶层 <code>type</code> 字段决定语义。</p>
+<p><strong><code>session_meta</code></strong> — 会话元信息</p>
+<pre><code class="language-json">{
+  &quot;timestamp&quot;: &quot;2026-05-16T02:00:00.000Z&quot;,
+  &quot;type&quot;: &quot;session_meta&quot;,
+  &quot;payload&quot;: { &quot;id&quot;: &quot;...&quot;, &quot;cwd&quot;: &quot;/path/to/project&quot; }
+}
+</code></pre>
+<p><strong><code>turn_context</code></strong> — 回合上下文</p>
+<pre><code class="language-json">{
+  &quot;timestamp&quot;: &quot;2026-05-16T02:00:01.000Z&quot;,
+  &quot;type&quot;: &quot;turn_context&quot;,
+  &quot;payload&quot;: {
+    &quot;cwd&quot;: &quot;/path/to/project&quot;,
+    &quot;model&quot;: &quot;gpt-5.5&quot;,
+    &quot;collaboration_mode&quot;: { &quot;settings&quot;: { &quot;model&quot;: &quot;gpt-5.5&quot; } }
+  }
+}
+</code></pre>
+<ul>
+<li><code>payload.model</code> 是模型分布的可靠来源</li>
+<li>注意 <code>collaboration_mode.settings.model</code> 重复了模型名，用 regex 全文匹配会导致双倍计数</li>
+</ul>
+<p><strong><code>event_msg</code></strong> — 事件消息，由 <code>payload.type</code> 区分</p>
+<pre><code class="language-json">// 用户消息
+{ &quot;type&quot;: &quot;event_msg&quot;, &quot;payload&quot;: { &quot;type&quot;: &quot;user_message&quot;, &quot;message&quot;: &quot;...&quot; } }
+
+// Agent 消息
+{ &quot;type&quot;: &quot;event_msg&quot;, &quot;payload&quot;: { &quot;type&quot;: &quot;agent_message&quot;, &quot;message&quot;: &quot;...&quot; } }
+
+// Token 统计
+{
+  &quot;type&quot;: &quot;event_msg&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;token_count&quot;,
+    &quot;info&quot;: {
+      &quot;last_token_usage&quot;: {
+        &quot;input_tokens&quot;: 23332,
+        &quot;output_tokens&quot;: 240,
+        &quot;cached_input_tokens&quot;: 3456,
+        &quot;reasoning_output_tokens&quot;: 76,
+        &quot;total_tokens&quot;: 23572
+      },
+      &quot;total_token_usage&quot;: { ... },
+      &quot;model_context_window&quot;: 200000
+    }
+  }
+}
+</code></pre>
+<ul>
+<li><code>last_token_usage</code>：当次调用的 token 用量（<strong>推荐使用</strong>）</li>
+<li><code>total_token_usage</code>：累计 token（不推荐，早期版本可能不存在）</li>
+<li><code>last_token_usage</code> 可能为 <code>null</code>（会话首行），需做空值检查</li>
+<li>其他 <code>payload.type</code>：<code>patch_apply_end</code>、<code>task_started</code>、<code>task_complete</code>、<code>web_search_end</code>、<code>turn_aborted</code> 等（不计入可见消息）</li>
+</ul>
+<p><strong><code>response_item</code></strong> — 模型响应和工具调用，由 <code>payload.type</code> 区分</p>
+<pre><code class="language-json">// 消息
+{ &quot;type&quot;: &quot;response_item&quot;, &quot;payload&quot;: { &quot;type&quot;: &quot;message&quot;, &quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: [...] } }
+
+// 普通工具调用
+{ &quot;type&quot;: &quot;response_item&quot;, &quot;payload&quot;: { &quot;type&quot;: &quot;function_call&quot;, &quot;name&quot;: &quot;exec_command&quot;, &quot;call_id&quot;: &quot;call-1&quot;, &quot;arguments&quot;: &quot;{\&quot;cmd\&quot;:\&quot;pwd\&quot;}&quot; } }
+
+// 普通工具结果
+{ &quot;type&quot;: &quot;response_item&quot;, &quot;payload&quot;: { &quot;type&quot;: &quot;function_call_output&quot;, &quot;call_id&quot;: &quot;call-1&quot;, &quot;output&quot;: &quot;...&quot; } }
+
+// 自定义工具调用
+{ &quot;type&quot;: &quot;response_item&quot;, &quot;payload&quot;: { &quot;type&quot;: &quot;custom_tool_call&quot;, &quot;name&quot;: &quot;apply_patch&quot;, &quot;call_id&quot;: &quot;call-2&quot;, &quot;input&quot;: &quot;...&quot; } }
+
+// 自定义工具结果
+{ &quot;type&quot;: &quot;response_item&quot;, &quot;payload&quot;: { &quot;type&quot;: &quot;custom_tool_call_output&quot;, &quot;call_id&quot;: &quot;call-2&quot;, &quot;output&quot;: &quot;...&quot; } }
+
+// 推理（不展示为可见消息）
+{ &quot;type&quot;: &quot;response_item&quot;, &quot;payload&quot;: { &quot;type&quot;: &quot;reasoning&quot; } }
+</code></pre>
+<hr />
+<h2 id="3-token-口径差异核心知识点">3. Token 口径差异（核心知识点）<a class="header-anchor" href="#3-token-口径差异核心知识点">#</a></h2>
+<p><strong>这是两家最重要的差异，直接影响 UI 展示的可比性。</strong></p>
+<h3 id="claude-anthropic-api">Claude (Anthropic API)<a class="header-anchor" href="#claude-anthropic-api">#</a></h3>
+<pre><code class="language-json">{
+  &quot;input_tokens&quot;: 6,
+  &quot;output_tokens&quot;: 185,
+  &quot;cache_creation_input_tokens&quot;: 26222,
+  &quot;cache_read_input_tokens&quot;: 0
+}
+</code></pre>
+<ul>
+<li><code>input_tokens</code>：<strong>仅新增、未缓存的输入 token</strong>（不含缓存命中和缓存创建）</li>
+<li><code>cache_read_input_tokens</code>：从 prompt cache 读取的输入 token</li>
+<li><code>cache_creation_input_tokens</code>：写入 prompt cache 的输入 token</li>
+<li><strong>实际总输入</strong> = <code>input_tokens</code> + <code>cache_read_input_tokens</code> + <code>cache_creation_input_tokens</code></li>
+</ul>
+<h3 id="codex-openai-api">Codex (OpenAI API)<a class="header-anchor" href="#codex-openai-api">#</a></h3>
+<pre><code class="language-json">{
+  &quot;input_tokens&quot;: 23332,
+  &quot;output_tokens&quot;: 240,
+  &quot;cached_input_tokens&quot;: 3456,
+  &quot;reasoning_output_tokens&quot;: 76,
+  &quot;total_tokens&quot;: 23572
+}
+</code></pre>
+<ul>
+<li><code>input_tokens</code>：<strong>全部输入 token</strong>（已包含缓存命中）</li>
+<li><code>cached_input_tokens</code>：<code>input_tokens</code> 的子集，表示缓存命中部分</li>
+<li><code>reasoning_output_tokens</code>：<code>output_tokens</code> 的子集，表示推理 token</li>
+<li><code>total_tokens</code> = <code>input_tokens</code> + <code>output_tokens</code></li>
+</ul>
+<h3 id="对照表">对照表<a class="header-anchor" href="#对照表">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>Claude 字段</th>
+<th>Codex 字段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>总输入</td>
+<td><code>input_tokens + cache_creation + cache_read</code></td>
+<td><code>input_tokens</code></td>
+</tr>
+<tr>
+<td>新增输入（非缓存）</td>
+<td><code>input_tokens</code></td>
+<td><code>input_tokens - cached_input_tokens</code></td>
+</tr>
+<tr>
+<td>缓存读取/命中</td>
+<td><code>cache_read_input_tokens</code></td>
+<td><code>cached_input_tokens</code></td>
+</tr>
+<tr>
+<td>缓存创建</td>
+<td><code>cache_creation_input_tokens</code></td>
+<td>无此字段</td>
+</tr>
+<tr>
+<td>总输出</td>
+<td><code>output_tokens</code></td>
+<td><code>output_tokens</code></td>
+</tr>
+<tr>
+<td>推理输出</td>
+<td>无此字段</td>
+<td><code>reasoning_output_tokens</code>（子集）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="统一展示口径">统一展示口径<a class="header-anchor" href="#统一展示口径">#</a></h3>
+<p>UI 展示时应统一为「总输入」口径：</p>
+<ul>
+<li><strong>输入 Token</strong>：Claude = <code>input + cache_read + cache_creation</code>；Codex = <code>input</code>（原始值）</li>
+<li><strong>输出 Token</strong>：两家均为 <code>output_tokens</code>（直接可比）</li>
+<li><strong>总 Token</strong>：<code>输入 + 输出</code></li>
+<li><strong>缓存命中</strong>：Claude = <code>cache_read_input_tokens</code>；Codex = <code>cached_input_tokens</code></li>
+<li><strong>缓存创建</strong>：Claude = <code>cache_creation_input_tokens</code>；Codex = 无（展示 0）</li>
+</ul>
+<p>不统一口径的后果：Claude 显示 input 0.06M（仅新增），Codex 显示 input 539M（含缓存），差距 9000 倍，误导用户以为 Codex 消耗远高于 Claude。统一后 Claude 828M / Codex 692M，同一量级，符合实际。</p>
+<hr />
+<h2 id="4-指标统计口径">4. 指标统计口径<a class="header-anchor" href="#4-指标统计口径">#</a></h2>
+<h3 id="总会话">总会话<a class="header-anchor" href="#总会话">#</a></h3>
+<ul>
+<li>Claude：统计 <code>~/.claude/projects/**/*.jsonl</code> 文件数（排除 subagents/memory/worktrees/node_modules 目录，排除 &lt;200 字节文件）</li>
+<li>Codex：统计 <code>~/.codex/sessions/**/*.jsonl</code> 文件数</li>
+</ul>
+<h3 id="总消息可见消息">总消息（可见消息）<a class="header-anchor" href="#总消息可见消息">#</a></h3>
+<p>Claude 计入：</p>
+<ul>
+<li><code>type === &quot;user&quot;</code> 且 content 非空</li>
+<li><code>type === &quot;assistant&quot;</code> 且 content 非空（text/tool_use blocks）</li>
+<li><code>tool_use</code> 和 <code>tool_result</code> blocks 分别拆为独立消息</li>
+</ul>
+<p>Claude 不计入：</p>
+<ul>
+<li><code>type</code> 属于元数据类型（permission-mode 等 8 种）</li>
+<li><code>type === &quot;system&quot;</code>（turn_duration 等）</li>
+<li><code>thinking</code> blocks</li>
+</ul>
+<p>Codex 计入：</p>
+<ul>
+<li><code>event_msg</code> 的 <code>user_message</code> 和 <code>agent_message</code></li>
+<li><code>response_item</code> 的 <code>message</code>（role 为 user/assistant 且内容非空）</li>
+<li><code>response_item</code> 的 <code>function_call</code>、<code>function_call_output</code>、<code>custom_tool_call</code>、<code>custom_tool_call_output</code></li>
+</ul>
+<p>Codex 不计入：</p>
+<ul>
+<li><code>session_meta</code>、<code>turn_context</code>、<code>compacted</code></li>
+<li><code>event_msg</code> 的 <code>token_count</code>、<code>patch_apply_end</code> 等</li>
+<li><code>response_item</code> 的 <code>reasoning</code></li>
+<li>developer/system 角色消息</li>
+</ul>
+<h3 id="工具调用次数">工具调用次数<a class="header-anchor" href="#工具调用次数">#</a></h3>
+<ul>
+<li>Claude：统计 <code>tool_use</code> blocks 数量（不含 <code>tool_result</code>）</li>
+<li>Codex：统计 <code>function_call</code> + <code>custom_tool_call</code>（不含 <code>_output</code> 结果记录）</li>
+<li>工具名称：Claude 从 <code>tool_use.name</code>；Codex 从 <code>payload.name</code></li>
+</ul>
+<h3 id="模型分布">模型分布<a class="header-anchor" href="#模型分布">#</a></h3>
+<ul>
+<li>Claude：从 <code>assistant</code> 消息的 <code>message.model</code> 提取，跳过 <code>&lt;synthetic&gt;</code></li>
+<li>Codex：从 <code>turn_context</code> 的 <code>payload.model</code> 提取</li>
+<li>注意：Codex 的 <code>turn_context</code> 中 <code>collaboration_mode.settings.model</code> 会重复模型名，用 regex 全文匹配会导致双倍计数，应改用 per-line JSON.parse 只取 <code>payload.model</code></li>
+</ul>
+<h3 id="token-用量">Token 用量<a class="header-anchor" href="#token-用量">#</a></h3>
+<ul>
+<li>Claude：从 <code>assistant</code> 消息的 <code>message.usage</code> 提取（detail 层），或 regex per-line first-match 扫描（summary 层）</li>
+<li>Codex：从 <code>event_msg</code> 的 <code>token_count</code> → <code>info.last_token_usage</code> 提取</li>
+<li>见第 3 节口径统一说明</li>
+</ul>
+<h3 id="耗时">耗时<a class="header-anchor" href="#耗时">#</a></h3>
+<ul>
+<li>Claude：从 <code>system</code> 消息的 <code>subtype === &quot;turn_duration&quot;</code> 提取 <code>durationMs</code>，累加所有轮次</li>
+<li>Codex：<strong>无可靠 duration 字段</strong>，应展示 &quot;—&quot; 或 0</li>
+</ul>
+<h3 id="技能子代理">技能/子代理<a class="header-anchor" href="#技能子代理">#</a></h3>
+<ul>
+<li>Claude：从 <code>tool_use</code> block 的 <code>input</code> 字段结构化提取——<code>name === &quot;Skill&quot;</code> 时取 <code>input.skill</code>；<code>name === &quot;Agent&quot;</code> 时取 <code>input.subagent_type</code></li>
+<li>Codex：当前 JSONL 中无对应结构</li>
+</ul>
+<hr />
+<h2 id="5-两层提取策略">5. 两层提取策略<a class="header-anchor" href="#5-两层提取策略">#</a></h2>
+<p>为平衡性能和精度，采用两层提取：</p>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>用途</th>
+<th>方法</th>
+<th>数据来源</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Summary（列表）</td>
+<td>快速展示所有会话</td>
+<td><code>fd.read</code> 只读前 1MB + regex 快扫 + 线性缩放</td>
+<td><code>fastScanToolStats</code></td>
+</tr>
+<tr>
+<td>Detail（详情）</td>
+<td>单个会话完整信息</td>
+<td><code>fs.readFile</code> 全量读取 + JSON.parse 每行</td>
+<td><code>normalizeMessages</code> / <code>normalizeCodexRow</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="summary-层注意事项">Summary 层注意事项<a class="header-anchor" href="#summary-层注意事项">#</a></h3>
+<ul>
+<li>Claude 和 Codex 都只读前 1MB（<code>SCAN_LIMIT</code>），超出部分按比例缩放</li>
+<li>Token 统计：Claude 用 regex per-line first-match（避免 <code>usage.iterations[]</code> 重复）；Codex 用 per-line JSON.parse 提取 <code>last_token_usage</code></li>
+<li>工具统计：Claude 用 <code>&quot;tool_use&quot;.*?&quot;name&quot;:&quot;xxx&quot;</code> regex；Codex 用 <code>&quot;function_call&quot;.*?&quot;name&quot;:&quot;xxx&quot;</code> regex</li>
+<li>模型统计：Claude 用全文 regex；Codex 必须 per-line JSON.parse <code>turn_context</code> 行（避免嵌套 model 字段重复计数）</li>
+<li>缩放影响：工具/消息/token 统计可能因分布不均而有误差，但满足列表场景的精度需求</li>
+</ul>
+<h3 id="detail-层注意事项">Detail 层注意事项<a class="header-anchor" href="#detail-层注意事项">#</a></h3>
+<ul>
+<li>全量 JSON.parse 保证精确</li>
+<li><code>tool_use</code> / <code>tool_result</code> blocks 拆分为独立 <code>SessionMessage</code></li>
+<li><code>thinking</code> blocks 跳过</li>
+<li>Codex 的 <code>token_count</code> 事件转为不可见的 system 消息，携带 <code>tokenUsage</code> 字段</li>
+<li>Codex 的 <code>turn_context</code> 转为不可见的 system 消息，携带 <code>model</code> 字段</li>
+</ul>
+<h3 id="性能参考">性能参考<a class="header-anchor" href="#性能参考">#</a></h3>
+<ul>
+<li>Claude 16 sessions / 33ms（文件较小，多数 &lt;1MB）</li>
+<li>Codex 48 sessions / 111ms（含 85MB 大文件，限读 1MB 后）</li>
+<li>Codex 未优化前全量读取：1056ms</li>
+</ul>
+<hr />
+<h2 id="6-会话-id-体系">6. 会话 ID 体系<a class="header-anchor" href="#6-会话-id-体系">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>ID 类型</th>
+<th>生成方式</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Session ID</td>
+<td><code>SHA1(&quot;agent:absolutePath&quot;)</code></td>
+<td>稳定唯一标识，跨平台一致</td>
+</tr>
+<tr>
+<td>Native ID</td>
+<td>Claude: 文件名中的 UUID；Codex: <code>session_meta.payload.id</code></td>
+<td>用于 <code>claude --resume</code> 等原生命令</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-实现注意事项">7. 实现注意事项<a class="header-anchor" href="#7-实现注意事项">#</a></h2>
+<ol>
+<li><strong>Token 口径必须统一</strong>：Claude 的 <code>input_tokens</code> 仅是新增部分，展示前需加上 <code>cache_creation</code> + <code>cache_read</code>，否则与 Codex 不可比。</li>
+<li><strong>不要依赖 <code>total_token_usage</code></strong>：Codex 早期版本可能无此字段；即使存在也是累计值，不适合逐行求和。</li>
+<li><strong>Codex <code>last_token_usage</code> 可为 null</strong>：会话首行的 <code>token_count</code> 事件中此字段为 null，需做空值检查。</li>
+<li><strong>Codex model 需 per-line 解析</strong>：<code>turn_context</code> 行中 <code>collaboration_mode.settings.model</code> 与 <code>payload.model</code> 重复，全文 regex 会双倍计数。</li>
+<li><strong>工具 TOP 需保留 count</strong>：overview 聚合应累加工具的调用次数，而非统计「使用过该工具的会话数」。</li>
+<li><strong>Codex 无 duration</strong>：当前 JSONL 中没有 <code>turn_duration</code> 或等效字段，不应伪造，展示 &quot;—&quot;。</li>
+<li><strong><code>cached_input_tokens</code> 映射为缓存读取</strong>：不是缓存创建；Codex 无缓存创建字段。</li>
+<li><strong>Skill/Subagent 从结构化字段提取</strong>：不要用 regex 匹配自然语言（如 <code>&quot;Used Skill: xxx&quot;</code>），会误匹配普通文本中的 &quot;skill&quot; 等词。应从 <code>tool_use</code> block 的 <code>input.skill</code> / <code>input.subagent_type</code> 字段精确提取。</li>
+<li><strong>Summary 层性能优先</strong>：大文件（85MB+）必须限读前 1MB + 缩放，全量读取会导致秒级延迟。</li>
+</ol>
+  </div>
+  <footer class="doc-footer">
+    <div>源文件：<code>knowledge/codex/local-sessions-structure.md</code></div>
+    <div>生成于：2026-05-20 03:06</div>
+  </footer>
+</article>
+<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#1-文件位置与命名">1. 文件位置与命名</a></li>
+<li class="toc-l3"><a href="#claude-code">Claude Code</a></li>
+<li class="toc-l3"><a href="#codex-cli">Codex CLI</a></li>
+<li class="toc-l2"><a href="#2-jsonl-记录类型">2. JSONL 记录类型</a></li>
+<li class="toc-l3"><a href="#21-claude-code">2.1 Claude Code</a></li>
+<li class="toc-l3"><a href="#22-codex-cli">2.2 Codex CLI</a></li>
+<li class="toc-l2"><a href="#3-token-口径差异核心知识点">3. Token 口径差异（核心知识点）</a></li>
+<li class="toc-l3"><a href="#claude-anthropic-api">Claude (Anthropic API)</a></li>
+<li class="toc-l3"><a href="#codex-openai-api">Codex (OpenAI API)</a></li>
+<li class="toc-l3"><a href="#对照表">对照表</a></li>
+<li class="toc-l3"><a href="#统一展示口径">统一展示口径</a></li>
+<li class="toc-l2"><a href="#4-指标统计口径">4. 指标统计口径</a></li>
+<li class="toc-l3"><a href="#总会话">总会话</a></li>
+<li class="toc-l3"><a href="#总消息可见消息">总消息（可见消息）</a></li>
+<li class="toc-l3"><a href="#工具调用次数">工具调用次数</a></li>
+<li class="toc-l3"><a href="#模型分布">模型分布</a></li>
+<li class="toc-l3"><a href="#token-用量">Token 用量</a></li>
+<li class="toc-l3"><a href="#耗时">耗时</a></li>
+<li class="toc-l3"><a href="#技能子代理">技能/子代理</a></li>
+<li class="toc-l2"><a href="#5-两层提取策略">5. 两层提取策略</a></li>
+<li class="toc-l3"><a href="#summary-层注意事项">Summary 层注意事项</a></li>
+<li class="toc-l3"><a href="#detail-层注意事项">Detail 层注意事项</a></li>
+<li class="toc-l3"><a href="#性能参考">性能参考</a></li>
+<li class="toc-l2"><a href="#6-会话-id-体系">6. 会话 ID 体系</a></li>
+<li class="toc-l2"><a href="#7-实现注意事项">7. 实现注意事项</a></li></ol></div></details></aside>
+</main>
+<script>
+(function () {
+  document.querySelectorAll('pre > code').forEach(function (codeEl) {
+    var pre = codeEl.parentElement;
+    if (!pre || pre.parentElement.classList.contains('code-wrap')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'code-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.type = 'button';
+    btn.textContent = '复制';
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(codeEl.innerText).then(function () {
+        btn.textContent = '已复制';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          btn.textContent = '复制';
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1541 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude Code 执行机制全景分析</title>
+  <style>
+:root {
+  color-scheme: light;
+  --bg: #f7f8fb;
+  --paper: #ffffff;
+  --text: #1f2937;
+  --text-strong: #111827;
+  --muted: #667085;
+  --line: #d9dee8;
+  --accent: #0f766e;
+  --accent-soft: #eef6f5;
+  --accent-deep: #134e4a;
+  --warn: #7c2d12;
+  --code-bg: #f1f5f9;
+  --code-block-bg: #0f172a;
+  --code-block-fg: #e5e7eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 16px;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.68;
+}
+
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 32px;
+  align-items: start;
+}
+
+main.no-toc {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1000px;
+}
+
+article {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 42px 48px;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.05);
+  min-width: 0;
+}
+
+/* Header block */
+.doc-header h1 {
+  margin: 0 0 12px;
+  font-size: 32px;
+  line-height: 1.25;
+  color: var(--text-strong);
+}
+
+.doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.doc-meta .date {
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-meta .sep {
+  color: var(--line);
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.status {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.status-complete { background: #dcfce7; color: #166534; }
+.status-wip      { background: #fef3c7; color: #92400e; }
+.status-draft    { background: #e5e7eb; color: #4b5563; }
+
+.doc-meta-extra {
+  background: var(--accent-soft);
+  border: 1px solid #d6e9e7;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 20px;
+  color: var(--accent-deep);
+  font-size: 14px;
+}
+.doc-meta-extra dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.doc-meta-extra dt {
+  font-weight: 500;
+}
+.doc-meta-extra dd {
+  margin: 0;
+}
+
+.lead {
+  font-size: 17px;
+  color: #243041;
+  border-left: 4px solid var(--accent);
+  padding: 4px 0 4px 14px;
+  margin: 16px 0 28px;
+}
+
+/* Headings inside body */
+.doc-body h2 {
+  margin: 38px 0 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 23px;
+  line-height: 1.3;
+  color: var(--text-strong);
+  scroll-margin-top: 16px;
+}
+.doc-body h3 {
+  margin: 26px 0 10px;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--accent-deep);
+  scroll-margin-top: 16px;
+}
+.doc-body h4 {
+  margin: 20px 0 8px;
+  font-size: 16px;
+  color: var(--text-strong);
+}
+
+.doc-body h2 .header-anchor,
+.doc-body h3 .header-anchor,
+.doc-body h4 .header-anchor {
+  margin-left: 8px;
+  color: var(--line);
+  text-decoration: none;
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.doc-body h2:hover .header-anchor,
+.doc-body h3:hover .header-anchor,
+.doc-body h4:hover .header-anchor {
+  opacity: 1;
+}
+
+/* Text content */
+.doc-body p { margin: 10px 0; }
+.doc-body ul, .doc-body ol { margin: 8px 0 16px 24px; padding: 0; }
+.doc-body li { margin: 4px 0; }
+.doc-body li > p { margin: 4px 0; }
+
+.doc-body blockquote {
+  border-left: 4px solid var(--line);
+  padding: 4px 0 4px 14px;
+  margin: 14px 0;
+  color: var(--muted);
+}
+
+.doc-body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 24px 0;
+}
+
+/* Inline code & code blocks */
+.doc-body code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.code-wrap {
+  position: relative;
+  margin: 14px 0;
+}
+.code-wrap pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--code-block-bg);
+  color: var(--code-block-fg);
+  line-height: 1.5;
+  font-size: 13.5px;
+}
+.code-wrap pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.code-wrap:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.copy-btn.copied { color: #86efac; }
+
+/* Tables */
+.doc-body table {
+  width: 100%;
+  margin: 14px 0 22px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.doc-body th, .doc-body td {
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  vertical-align: top;
+  text-align: left;
+}
+.doc-body th {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 500;
+}
+
+/* Admonitions (GitHub-style) */
+.admonition {
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 18px 0;
+  border: 1px solid;
+  background: #fff;
+}
+.admonition-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+.admonition-title::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.admonition > p:last-child { margin-bottom: 0; }
+.admonition > p:first-of-type { margin-top: 0; }
+
+.admonition.note      { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.admonition.tip       { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.admonition.important { background: #f5f3ff; border-color: #ddd6fe; color: #5b21b6; }
+.admonition.warning   { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.admonition.caution   { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+.admonition > p { color: var(--text); }
+
+/* Images */
+.doc-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+/* Links */
+.doc-body a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+.doc-body a:hover {
+  border-bottom-color: var(--accent);
+}
+
+/* TOC sidebar */
+aside.toc {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 16px 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+aside.toc .toc-title {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+aside.toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+aside.toc li { margin: 4px 0; }
+aside.toc a {
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border-left: 2px solid transparent;
+  line-height: 1.45;
+}
+aside.toc a:hover {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+aside.toc .toc-l3 a {
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Footer */
+.doc-footer {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.doc-footer code {
+  background: var(--code-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Narrow screens */
+@media (max-width: 980px) {
+  main {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px 12px 40px;
+  }
+  article {
+    padding: 24px 18px;
+  }
+  .doc-header h1 { font-size: 26px; }
+  .doc-body h2 { font-size: 20px; }
+  .doc-body table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  aside.toc {
+    position: static;
+    max-height: none;
+    order: -1;
+  }
+  aside.toc.collapsible {
+    padding: 0;
+  }
+  aside.toc.collapsible summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    list-style: none;
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  aside.toc.collapsible .toc-body {
+    padding: 0 16px 14px;
+  }
+  aside.toc.collapsible .toc-title { display: none; }
+}
+
+  </style>
+</head>
+<body>
+<main class="">
+<article>
+  <header class="doc-header">
+    <h1>Claude Code 执行机制全景分析</h1>
+    <div class="doc-meta"><span class="date">2026-04-18</span>
+        <span class="tag-chip">claude-code</span>
+        <span class="tag-chip">agent</span>
+        <span class="tag-chip">架构</span>
+        <span class="status status-complete">complete</span></div>
+
+
+  </header>
+  <div class="doc-body">
+<blockquote>
+<p>本文档基于 Claude Code CLI/桌面端/IDE 插件的可观测行为与系统机制，系统梳理会话、Session、记忆、Skill、工具调用等核心底层逻辑。</p>
+</blockquote>
+<hr />
+<h2 id="目录">目录<a class="header-anchor" href="#目录">#</a></h2>
+<ol>
+<li><a href="#1-%E4%BC%9A%E8%AF%9D%E5%9F%BA%E7%A1%80%E6%9E%B6%E6%9E%84">会话（Conversation）基础架构</a></li>
+<li><a href="#2-%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AA%97%E5%8F%A3%E4%B8%8E%E5%8E%8B%E7%BC%A9%E6%9C%BA%E5%88%B6">上下文窗口与压缩机制</a></li>
+<li><a href="#3-%E7%B3%BB%E7%BB%9F%E6%8F%90%E7%A4%BA%E5%B1%82%E7%BA%A7">系统提示（System Prompt）层级</a></li>
+<li><a href="#4-%E5%B7%A5%E5%85%B7%E7%B3%BB%E7%BB%9F%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90">工具系统（Tools）深度解析</a></li>
+<li><a href="#5-%E6%9D%83%E9%99%90%E6%A8%A1%E5%9E%8B">权限模型（Permission Model）</a></li>
+<li><a href="#6-hooks-%E6%89%A7%E8%A1%8C%E6%9C%BA%E5%88%B6">Hooks 执行机制</a></li>
+<li><a href="#7-%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F">记忆系统（Memory System）</a></li>
+<li><a href="#8-skill-%E7%B3%BB%E7%BB%9F">Skill 系统</a></li>
+<li><a href="#9-%E5%AD%90%E4%BB%A3%E7%90%86%E7%B3%BB%E7%BB%9F">子代理系统（Sub-agent / Agent Tool）</a></li>
+<li><a href="#10-claudemd-%E9%85%8D%E7%BD%AE%E5%B1%82%E7%BA%A7">CLAUDE.md 配置层级</a></li>
+<li><a href="#11-prompt-%E7%BC%93%E5%AD%98">Prompt 缓存（Prompt Cache）</a></li>
+<li><a href="#12-%E8%B0%83%E5%BA%A6%E4%B8%8E%E5%AE%9A%E6%97%B6%E4%BB%BB%E5%8A%A1">调度与定时任务（Cron / Schedule）</a></li>
+<li><a href="#13-%E4%BB%BB%E5%8A%A1%E8%B7%9F%E8%B8%AA%E7%B3%BB%E7%BB%9F">任务跟踪系统（Task System）</a></li>
+<li><a href="#14-%E6%A8%A1%E5%9E%8B%E9%80%89%E6%8B%A9%E4%B8%8E-fast-mode">模型选择与 Fast Mode</a></li>
+<li><a href="#15-%E4%BC%9A%E8%AF%9D%E6%A0%87%E8%AF%86%E7%AC%A6%E4%B8%8E%E6%8C%81%E4%B9%85%E5%8C%96">会话标识符与持久化</a></li>
+<li><a href="#16-%E5%AE%8C%E6%95%B4%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B%E6%97%B6%E5%BA%8F%E5%9B%BE">完整执行流程时序图</a></li>
+</ol>
+<hr />
+<h2 id="1-会话基础架构">1. 会话基础架构<a class="header-anchor" href="#1-会话基础架构">#</a></h2>
+<h3 id="11-消息结构">1.1 消息结构<a class="header-anchor" href="#11-消息结构">#</a></h3>
+<p>每轮对话由以下角色的消息交替组成：</p>
+<pre><code>system  →  user  →  assistant  →  user  →  assistant  →  ...
+</code></pre>
+<ul>
+<li><strong>system</strong>：初始化时注入，包含 CLAUDE.md 内容、记忆索引（MEMORY.md）、可用 Skill 列表、可用 Deferred Tools 列表、环境信息（OS、Shell、工作目录、模型 ID 等）。</li>
+<li><strong>user</strong>：用户明文输入，也可包含 <code>&lt;system-reminder&gt;</code> 标签（运行时动态注入的系统级信息）。</li>
+<li><strong>assistant</strong>：模型输出，包含文本和工具调用（tool_use）块，二者可混合出现。</li>
+</ul>
+<h3 id="12-system-reminder-标签机制">1.2 <code>&lt;system-reminder&gt;</code> 标签机制<a class="header-anchor" href="#12-system-reminder-标签机制">#</a></h3>
+<p><code>&lt;system-reminder&gt;</code> 是平台在 <strong>user 角色消息</strong> 中动态注入的系统信息，常见内容：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>注入时机</th>
+<th>典型内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Deferred Tools 列表</td>
+<td>每轮对话开头</td>
+<td>尚未加载 schema 的工具名单</td>
+</tr>
+<tr>
+<td>Skills 列表</td>
+<td>每轮对话开头</td>
+<td>可调用的 Skill 名称与触发条件</td>
+</tr>
+<tr>
+<td>CLAUDE.md 内容</td>
+<td>每轮对话开头</td>
+<td>用户/项目级指令</td>
+</tr>
+<tr>
+<td>MEMORY.md 内容</td>
+<td>每轮对话开头</td>
+<td>记忆索引文件</td>
+</tr>
+<tr>
+<td>Hook 反馈</td>
+<td>工具调用后</td>
+<td>hooks 的 stdout 输出</td>
+</tr>
+</tbody>
+</table>
+<p><strong>关键特性</strong>：<code>&lt;system-reminder&gt;</code> 中的内容对模型具有类 system 指令的权威性，但在技术上仍走 user 角色通道注入，避免 system prompt 过长。</p>
+<h3 id="13-工具调用消息结构">1.3 工具调用消息结构<a class="header-anchor" href="#13-工具调用消息结构">#</a></h3>
+<pre><code>assistant message:
+  content[0]: text block   → &quot;我来查一下这个文件...&quot;
+  content[1]: tool_use block {
+    id: &quot;toolu_01Abc...&quot;
+    name: &quot;Read&quot;
+    input: { file_path: &quot;/foo/bar.py&quot; }
+  }
+
+user message (tool result):
+  content[0]: tool_result block {
+    tool_use_id: &quot;toolu_01Abc...&quot;
+    content: &quot;...文件内容...&quot;
+  }
+</code></pre>
+<p>一轮 assistant 输出可包含多个 tool_use 块（并行工具调用），随后的 user 消息包含对应数量的 tool_result。</p>
+<hr />
+<h2 id="2-上下文窗口与压缩机制">2. 上下文窗口与压缩机制<a class="header-anchor" href="#2-上下文窗口与压缩机制">#</a></h2>
+<h3 id="21-上下文窗口限制">2.1 上下文窗口限制<a class="header-anchor" href="#21-上下文窗口限制">#</a></h3>
+<p>当前 Claude Sonnet 4.6 / Opus 4.7 的上下文窗口为 <strong>200K tokens</strong>。随着对话进行，历史消息累积会逼近上限。</p>
+<h3 id="22-自动压缩auto-compaction">2.2 自动压缩（Auto-compaction）<a class="header-anchor" href="#22-自动压缩auto-compaction">#</a></h3>
+<p>当上下文接近限制时，系统自动触发消息压缩：</p>
+<ol>
+<li><strong>触发条件</strong>：上下文使用量接近阈值（通常 ~80-90%）</li>
+<li><strong>压缩策略</strong>：将较早的消息历史摘要化，保留：
+<ul>
+<li>当前目标（goal）</li>
+<li>已修改的文件列表</li>
+<li>关键决策和结论</li>
+<li>尚未完成的风险/问题</li>
+</ul>
+</li>
+<li><strong><code>/compact</code> 命令</strong>：用户主动触发，可附加保留要点提示</li>
+</ol>
+<p><strong>压缩后的影响</strong>：</p>
+<ul>
+<li>早期工具调用结果消失，但摘要保留关键信息</li>
+<li>Prompt cache 失效（因消息结构变化）</li>
+<li>模型对早期代码细节的记忆依赖压缩质量</li>
+</ul>
+<h3 id="23-continue-与-resume-参数">2.3 <code>--continue</code> 与 <code>--resume</code> 参数<a class="header-anchor" href="#23-continue-与-resume-参数">#</a></h3>
+<pre><code class="language-bash">claude --continue          # 继续最近一次会话
+claude --resume &lt;session-id&gt;  # 恢复指定 session
+</code></pre>
+<p>这些参数将历史消息重新载入上下文，使模型能&quot;接续&quot;之前的工作。</p>
+<hr />
+<h2 id="3-系统提示层级">3. 系统提示层级<a class="header-anchor" href="#3-系统提示层级">#</a></h2>
+<p>Claude Code 的系统提示由多层叠加构成，从高到低优先级：</p>
+<pre><code>┌─────────────────────────────────────────────┐
+│  Anthropic 内置 System Prompt（最高，不可见）   │
+├─────────────────────────────────────────────┤
+│  ~/.claude/CLAUDE.md  (Global User Config)   │
+├─────────────────────────────────────────────┤
+│  &lt;project&gt;/.claude/CLAUDE.md  (Project)      │
+├─────────────────────────────────────────────┤
+│  &lt;project&gt;/CLAUDE.md  (Local Project Root)   │
+├─────────────────────────────────────────────┤
+│  子目录 CLAUDE.md（按工作目录深度动态加载）     │
+├─────────────────────────────────────────────┤
+│  动态注入：MEMORY.md、Skills、工具列表、环境   │
+└─────────────────────────────────────────────┘
+</code></pre>
+<p><strong>覆盖规则</strong>：下层可覆盖上层，但 &quot;OVERRIDE&quot; 关键词（如 CLAUDE.md 中的 &quot;IMPORTANT: These instructions OVERRIDE&quot;）显式提升优先级。</p>
+<hr />
+<h2 id="4-工具系统tools深度解析">4. 工具系统（Tools）深度解析<a class="header-anchor" href="#4-工具系统tools深度解析">#</a></h2>
+<h3 id="41-工具分类">4.1 工具分类<a class="header-anchor" href="#41-工具分类">#</a></h3>
+<h4 id="411-always-available-tools始终可用">4.1.1 Always-Available Tools（始终可用）<a class="header-anchor" href="#411-always-available-tools始终可用">#</a></h4>
+<p>无需预加载，可直接调用：</p>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Read</code></td>
+<td>读取文件（支持 PDF、图片、Jupyter Notebook）</td>
+</tr>
+<tr>
+<td><code>Edit</code></td>
+<td>精确字符串替换编辑文件</td>
+</tr>
+<tr>
+<td><code>Write</code></td>
+<td>写入/覆盖文件</td>
+</tr>
+<tr>
+<td><code>Glob</code></td>
+<td>文件路径模式匹配</td>
+</tr>
+<tr>
+<td><code>Grep</code></td>
+<td>基于 ripgrep 的代码内容搜索</td>
+</tr>
+<tr>
+<td><code>Bash</code></td>
+<td>执行 shell 命令</td>
+</tr>
+<tr>
+<td><code>Agent</code></td>
+<td>启动子代理</td>
+</tr>
+<tr>
+<td><code>Skill</code></td>
+<td>调用技能</td>
+</tr>
+<tr>
+<td><code>ToolSearch</code></td>
+<td>加载 Deferred Tools 的 schema</td>
+</tr>
+</tbody>
+</table>
+<h4 id="412-deferred-tools延迟加载工具">4.1.2 Deferred Tools（延迟加载工具）<a class="header-anchor" href="#412-deferred-tools延迟加载工具">#</a></h4>
+<p>这类工具在 <code>&lt;system-reminder&gt;</code> 中只列出名字，<strong>不包含参数 schema</strong>。直接调用会触发 <code>InputValidationError</code>。必须先用 <code>ToolSearch</code> 加载 schema：</p>
+<pre><code>ToolSearch(&quot;select:WebFetch,WebSearch&quot;)
+→ 返回完整 JSON Schema
+→ 之后可正常调用 WebFetch/WebSearch
+</code></pre>
+<p>常见 Deferred Tools：</p>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WebFetch</code></td>
+<td>抓取网页内容</td>
+</tr>
+<tr>
+<td><code>WebSearch</code></td>
+<td>网络搜索</td>
+</tr>
+<tr>
+<td><code>TaskCreate/TaskGet/TaskList/TaskUpdate/TaskStop/TaskOutput</code></td>
+<td>任务管理</td>
+</tr>
+<tr>
+<td><code>CronCreate/CronDelete/CronList</code></td>
+<td>定时任务</td>
+</tr>
+<tr>
+<td><code>Monitor</code></td>
+<td>监听后台进程输出流</td>
+</tr>
+<tr>
+<td><code>AskUserQuestion</code></td>
+<td>主动向用户提问</td>
+</tr>
+<tr>
+<td><code>PushNotification</code></td>
+<td>推送通知</td>
+</tr>
+<tr>
+<td><code>RemoteTrigger</code></td>
+<td>触发远程操作</td>
+</tr>
+<tr>
+<td><code>EnterPlanMode/ExitPlanMode</code></td>
+<td>进入/退出计划模式</td>
+</tr>
+<tr>
+<td><code>EnterWorktree/ExitWorktree</code></td>
+<td>Git worktree 隔离</td>
+</tr>
+<tr>
+<td><code>NotebookEdit</code></td>
+<td>编辑 Jupyter Notebook</td>
+</tr>
+<tr>
+<td><code>ScheduleWakeup</code></td>
+<td>动态循环中的定时唤醒</td>
+</tr>
+<tr>
+<td><code>MCP 工具</code></td>
+<td>挂载的 MCP Server 工具</td>
+</tr>
+</tbody>
+</table>
+<p><strong>为什么延迟加载？</strong> 每个工具的 JSON Schema 占用 token，将不常用工具延迟加载可节省每轮的 token 开销并减少 prompt 长度。</p>
+<h3 id="42-工具调用并行性">4.2 工具调用并行性<a class="header-anchor" href="#42-工具调用并行性">#</a></h3>
+<pre><code>// 并行（无依赖关系时，单条 assistant 消息中多个 tool_use 块）:
+assistant: [Read(&quot;a.py&quot;), Read(&quot;b.py&quot;), Glob(&quot;**/*.ts&quot;)]  ← 一次输出
+
+// 串行（有依赖时，必须等前一个结果）:
+assistant: [Read(&quot;config.json&quot;)]
+user:      [tool_result: {...}]
+assistant: [Edit(&quot;config.json&quot;, ...)]  ← 依赖上一步结果
+</code></pre>
+<h3 id="43-bash-工具特殊行为">4.3 Bash 工具特殊行为<a class="header-anchor" href="#43-bash-工具特殊行为">#</a></h3>
+<ul>
+<li>工作目录在命令间<strong>不持久</strong>（每次 Bash 调用独立 shell）</li>
+<li>后台执行：<code>run_in_background: true</code>，完成后通知</li>
+<li>超时：默认 120s，最大 600s</li>
+<li>不建议 <code>-i</code> 交互式标志（无 TTY）</li>
+</ul>
+<h3 id="44-工具结果处理">4.4 工具结果处理<a class="header-anchor" href="#44-工具结果处理">#</a></h3>
+<p>工具结果以 <code>tool_result</code> 消息返回，模型基于结果继续推理。若工具调用被用户<strong>拒绝</strong>，Claude 不会重试相同调用，而是调整策略。</p>
+<hr />
+<h2 id="5-权限模型permission-model">5. 权限模型（Permission Model）<a class="header-anchor" href="#5-权限模型permission-model">#</a></h2>
+<h3 id="51-权限层级">5.1 权限层级<a class="header-anchor" href="#51-权限层级">#</a></h3>
+<pre><code>~/.claude/settings.json          ← 全局用户级
+&lt;project&gt;/.claude/settings.json  ← 项目级
+&lt;project&gt;/.claude/settings.local.json  ← 本地项目级（不入 git）
+</code></pre>
+<h3 id="52-权限模式">5.2 权限模式<a class="header-anchor" href="#52-权限模式">#</a></h3>
+<p>用户在启动时选择以下之一：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td>敏感操作需逐个确认</td>
+</tr>
+<tr>
+<td>Auto-approve (Shift+Tab)</td>
+<td>自动批准所有工具调用</td>
+</tr>
+<tr>
+<td>Custom allowlist</td>
+<td>按工具类型/命令预批准</td>
+</tr>
+</tbody>
+</table>
+<h3 id="53-settingsjson-结构示例">5.3 settings.json 结构示例<a class="header-anchor" href="#53-settingsjson-结构示例">#</a></h3>
+<pre><code class="language-json">{
+  &quot;permissions&quot;: {
+    &quot;allow&quot;: [
+      &quot;Bash(git *)&quot;,
+      &quot;Bash(npm run *)&quot;,
+      &quot;Read(*)&quot;,
+      &quot;Edit(*)&quot;
+    ],
+    &quot;deny&quot;: [
+      &quot;Bash(rm -rf *)&quot;,
+      &quot;Bash(git push --force)&quot;
+    ]
+  },
+  &quot;env&quot;: {
+    &quot;DEBUG&quot;: &quot;true&quot;
+  }
+}
+</code></pre>
+<p><strong>匹配规则</strong>：<code>deny</code> 优先于 <code>allow</code>；glob 模式匹配工具名及参数。</p>
+<h3 id="54-权限提示流程">5.4 权限提示流程<a class="header-anchor" href="#54-权限提示流程">#</a></h3>
+<pre><code>Claude 调用工具
+  → 权限系统检查 allow/deny 列表
+    → 命中 allow → 自动执行
+    → 命中 deny  → 拒绝，返回错误
+    → 无匹配     → 弹出用户确认对话框
+      → 用户批准 → 执行，可选&quot;记住此决定&quot;
+      → 用户拒绝 → Claude 收到拒绝信号，调整策略
+</code></pre>
+<hr />
+<h2 id="6-hooks-执行机制">6. Hooks 执行机制<a class="header-anchor" href="#6-hooks-执行机制">#</a></h2>
+<p>Hooks 是在特定事件发生时<strong>自动执行的 shell 命令</strong>，由 Claude Code 运行时（harness）触发，而非 Claude 模型本身。</p>
+<h3 id="61-hook-类型">6.1 Hook 类型<a class="header-anchor" href="#61-hook-类型">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Hook 名称</th>
+<th>触发时机</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PreToolUse</code></td>
+<td>工具调用之前</td>
+</tr>
+<tr>
+<td><code>PostToolUse</code></td>
+<td>工具调用之后</td>
+</tr>
+<tr>
+<td><code>UserPromptSubmit</code></td>
+<td>用户提交消息时</td>
+</tr>
+<tr>
+<td><code>Stop</code></td>
+<td>Claude 停止响应后</td>
+</tr>
+<tr>
+<td><code>SubagentStop</code></td>
+<td>子代理停止后</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62-配置示例">6.2 配置示例<a class="header-anchor" href="#62-配置示例">#</a></h3>
+<pre><code class="language-json">// settings.json
+{
+  &quot;hooks&quot;: {
+    &quot;PostToolUse&quot;: [{
+      &quot;matcher&quot;: &quot;Edit|Write&quot;,
+      &quot;hooks&quot;: [{
+        &quot;type&quot;: &quot;command&quot;,
+        &quot;command&quot;: &quot;npm run lint&quot;
+      }]
+    }],
+    &quot;Stop&quot;: [{
+      &quot;hooks&quot;: [{
+        &quot;type&quot;: &quot;command&quot;,
+        &quot;command&quot;: &quot;notify-send 'Claude finished'&quot;
+      }]
+    }]
+  }
+}
+</code></pre>
+<h3 id="63-hook-的输出反馈">6.3 Hook 的输出反馈<a class="header-anchor" href="#63-hook-的输出反馈">#</a></h3>
+<p>Hook 的 stdout 输出会作为 <code>&lt;system-reminder&gt;</code> 注入到下一轮消息中，Claude 可读取并响应（如 lint 错误）。Hook 被阻塞时，Claude 不会重试被阻塞的操作，而是询问用户如何调整。</p>
+<hr />
+<h2 id="7-记忆系统memory-system">7. 记忆系统（Memory System）<a class="header-anchor" href="#7-记忆系统memory-system">#</a></h2>
+<h3 id="71-文件结构">7.1 文件结构<a class="header-anchor" href="#71-文件结构">#</a></h3>
+<pre><code>~/.claude/projects/
+  -Users-panbk/         ← 按工作目录路径哈希命名
+    memory/
+      MEMORY.md         ← 索引文件（每轮自动载入）
+      user_role.md      ← 具体记忆文件
+      feedback_*.md
+      project_*.md
+      reference_*.md
+</code></pre>
+<h3 id="72-记忆类型">7.2 记忆类型<a class="header-anchor" href="#72-记忆类型">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>存储内容</th>
+<th>何时保存</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>user</code></td>
+<td>用户角色、偏好、技能背景</td>
+<td>了解到用户特征时</td>
+</tr>
+<tr>
+<td><code>feedback</code></td>
+<td>用户对 Claude 行为的纠正或确认</td>
+<td>用户给出工作方式反馈时</td>
+</tr>
+<tr>
+<td><code>project</code></td>
+<td>项目背景、决策、截止日期</td>
+<td>了解项目上下文时</td>
+</tr>
+<tr>
+<td><code>reference</code></td>
+<td>外部资源指针（Linear、Grafana等）</td>
+<td>了解外部系统地址时</td>
+</tr>
+</tbody>
+</table>
+<h3 id="73-记忆文件格式">7.3 记忆文件格式<a class="header-anchor" href="#73-记忆文件格式">#</a></h3>
+<pre><code class="language-markdown">---
+name: 用户技术背景
+description: 用户是 Go 专家，刚开始接触 React 前端
+type: user
+---
+
+用户有 10 年 Go 经验，是第一次接触本项目的 React 部分。
+
+**Why:** 用户在对话中自我介绍
+**How to apply:** 解释前端概念时用 Go 后端类比
+</code></pre>
+<h3 id="74-memorymd-索引机制">7.4 MEMORY.md 索引机制<a class="header-anchor" href="#74-memorymd-索引机制">#</a></h3>
+<pre><code class="language-markdown"># Memory Index
+
+- [用户角色](user_role.md) — Go 专家，React 新手
+- [反馈_简洁风格](feedback_terse.md) — 不要在回复末尾重复已做的事
+</code></pre>
+<p>MEMORY.md 的前 <strong>200 行</strong>会被自动载入每轮上下文（超出部分截断）。因此索引条目需保持简洁（≤150 字符/条）。</p>
+<h3 id="75-记忆读写流程">7.5 记忆读写流程<a class="header-anchor" href="#75-记忆读写流程">#</a></h3>
+<pre><code>对话开始
+  → system-reminder 注入 MEMORY.md 内容
+  → Claude 判断记忆相关性
+    → 相关 → 参考记忆调整行为
+    → 记忆可能过时 → 先验证（Read/Grep）再使用
+
+对话中
+  → 发现值得记忆的信息
+    → Write 写入具体记忆文件（含 frontmatter）
+    → Edit 更新 MEMORY.md 索引（新增一行）
+  
+  → 用户要求遗忘某事
+    → 找到对应文件，删除内容或文件
+    → 更新 MEMORY.md 索引
+</code></pre>
+<h3 id="76-记忆-vs-其他持久化方式对比">7.6 记忆 vs 其他持久化方式对比<a class="header-anchor" href="#76-记忆-vs-其他持久化方式对比">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>机制</th>
+<th>作用域</th>
+<th>生命周期</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Memory 文件</td>
+<td>跨会话</td>
+<td>永久</td>
+<td>用户偏好、项目背景</td>
+</tr>
+<tr>
+<td>Plan（计划模式）</td>
+<td>当前会话</td>
+<td>会话结束</td>
+<td>实现路径对齐</td>
+</tr>
+<tr>
+<td>Task 系统</td>
+<td>当前会话</td>
+<td>会话结束</td>
+<td>步骤跟踪进度</td>
+</tr>
+<tr>
+<td>CLAUDE.md</td>
+<td>跨会话</td>
+<td>永久</td>
+<td>行为规则、约定</td>
+</tr>
+<tr>
+<td>Bash 变量</td>
+<td>当前 Bash 调用</td>
+<td>瞬时</td>
+<td>命令间传递数据</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-skill-系统">8. Skill 系统<a class="header-anchor" href="#8-skill-系统">#</a></h2>
+<h3 id="81-什么是-skill">8.1 什么是 Skill<a class="header-anchor" href="#81-什么是-skill">#</a></h3>
+<p>Skill 是预定义的专业化工作流，通过 <code>Skill</code> 工具触发。本质上是一段特殊的 system-level 指令注入，使 Claude 获得某领域的额外上下文和行为规则。</p>
+<h3 id="82-skill-调用流程">8.2 Skill 调用流程<a class="header-anchor" href="#82-skill-调用流程">#</a></h3>
+<pre><code>用户输入 &quot;/review&quot; 或 Skill 触发条件满足
+  → Claude 调用 Skill(&quot;review&quot;) 工具
+  → 运行时加载对应 Skill 的指令（类似动态注入一段 CLAUDE.md）
+  → Claude 按 Skill 指令执行专业化工作流
+</code></pre>
+<h3 id="83-可用-skill-列表当前环境">8.3 可用 Skill 列表（当前环境）<a class="header-anchor" href="#83-可用-skill-列表当前环境">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Skill</th>
+<th>触发场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>update-config</code></td>
+<td>配置 settings.json、hooks、权限</td>
+</tr>
+<tr>
+<td><code>keybindings-help</code></td>
+<td>自定义键盘快捷键</td>
+</tr>
+<tr>
+<td><code>simplify</code></td>
+<td>代码质量审查与简化</td>
+</tr>
+<tr>
+<td><code>fewer-permission-prompts</code></td>
+<td>分析权限请求并添加白名单</td>
+</tr>
+<tr>
+<td><code>loop</code></td>
+<td>设置循环执行任务</td>
+</tr>
+<tr>
+<td><code>schedule</code></td>
+<td>创建定时远程代理</td>
+</tr>
+<tr>
+<td><code>claude-api</code></td>
+<td>Claude API / Anthropic SDK 开发</td>
+</tr>
+<tr>
+<td><code>claude-code-init</code></td>
+<td>初始化 Claude Code、CLAUDE.md</td>
+</tr>
+<tr>
+<td><code>codex:setup/rescue</code></td>
+<td>Codex CLI 集成</td>
+</tr>
+<tr>
+<td><code>init</code></td>
+<td>生成 CLAUDE.md 文档</td>
+</tr>
+<tr>
+<td><code>review</code></td>
+<td>PR 代码审查</td>
+</tr>
+<tr>
+<td><code>security-review</code></td>
+<td>安全审查</td>
+</tr>
+</tbody>
+</table>
+<h3 id="84-skill-与普通指令的区别">8.4 Skill 与普通指令的区别<a class="header-anchor" href="#84-skill-与普通指令的区别">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>普通对话指令</th>
+<th>Skill</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>持久性</td>
+<td>仅当前消息有效</td>
+<td>注入后在本轮会话有效</td>
+</tr>
+<tr>
+<td>专业深度</td>
+<td>依赖基础能力</td>
+<td>包含领域专用流程</td>
+</tr>
+<tr>
+<td>工具访问</td>
+<td>标准工具集</td>
+<td>可解锁特定工具组合</td>
+</tr>
+<tr>
+<td>触发方式</td>
+<td>自然语言</td>
+<td><code>/skill-name</code> 或条件触发</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-子代理系统sub-agent-agent-tool">9. 子代理系统（Sub-agent / Agent Tool）<a class="header-anchor" href="#9-子代理系统sub-agent-agent-tool">#</a></h2>
+<h3 id="91-agent-工具基础">9.1 Agent 工具基础<a class="header-anchor" href="#91-agent-工具基础">#</a></h3>
+<pre><code class="language-javascript">Agent({
+  description: &quot;简短描述（3-5词）&quot;,
+  subagent_type: &quot;Explore&quot;,     // 可选，指定专业类型
+  prompt: &quot;详细指令...&quot;,
+  model: &quot;sonnet&quot;,              // 可选，覆盖模型
+  run_in_background: false,     // 可选，后台运行
+  isolation: &quot;worktree&quot;         // 可选，git worktree 隔离
+})
+</code></pre>
+<h3 id="92-子代理类型">9.2 子代理类型<a class="header-anchor" href="#92-子代理类型">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>工具权限</th>
+<th>最佳用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Explore</code></td>
+<td>只读（无 Edit/Write/Agent）</td>
+<td>代码库探索、文件搜索</td>
+</tr>
+<tr>
+<td><code>claude-code-guide</code></td>
+<td>Read/Grep/Glob/WebFetch/WebSearch</td>
+<td>Claude API/SDK 问题</td>
+</tr>
+<tr>
+<td><code>claude-config-optimizer</code></td>
+<td>全部工具</td>
+<td>Agent 配置设计优化</td>
+</tr>
+<tr>
+<td><code>code-reviewer</code></td>
+<td>全部工具</td>
+<td>代码审查</td>
+</tr>
+<tr>
+<td><code>debugger</code></td>
+<td>全部工具</td>
+<td>错误调试</td>
+</tr>
+<tr>
+<td><code>test-writer</code></td>
+<td>全部工具</td>
+<td>编写测试</td>
+</tr>
+<tr>
+<td><code>refactor-advisor</code></td>
+<td>全部工具</td>
+<td>代码重构</td>
+</tr>
+<tr>
+<td><code>Plan</code></td>
+<td>只读（无 Edit/Write）</td>
+<td>实现方案设计</td>
+</tr>
+<tr>
+<td><code>general-purpose</code></td>
+<td>全部工具</td>
+<td>通用复杂任务</td>
+</tr>
+<tr>
+<td><code>codex:codex-rescue</code></td>
+<td>Bash</td>
+<td>Codex 任务救援</td>
+</tr>
+</tbody>
+</table>
+<h3 id="93-子代理的上下文隔离">9.3 子代理的上下文隔离<a class="header-anchor" href="#93-子代理的上下文隔离">#</a></h3>
+<p><strong>关键特性</strong>：子代理启动时完全冷启动，<strong>不携带父会话的任何历史记录</strong>。</p>
+<pre><code>父会话（主 Claude）
+  ├── 知道：用户名叫 John，项目是 X
+  └── 调用 Agent(prompt=&quot;...&quot;)
+        ↓
+      子代理（独立实例）
+        ├── 不知道：用户是谁、之前做了什么
+        ├── 需要 prompt 自包含所有必要上下文
+        └── 返回单条结果消息给父会话
+</code></pre>
+<p><strong>提示写法要求</strong>：Prompt 必须包含所有背景信息，不能依赖&quot;你知道我们之前讨论的...&quot;。</p>
+<h3 id="94-sendmessage-继续子代理">9.4 SendMessage 继续子代理<a class="header-anchor" href="#94-sendmessage-继续子代理">#</a></h3>
+<pre><code class="language-javascript">// 继续已有子代理（不新建）
+SendMessage({
+  to: &quot;agent-name-or-id&quot;,
+  message: &quot;继续刚才的工作...&quot;
+})
+</code></pre>
+<p>用于已存在的子代理有完整上下文时，避免冷启动的开销。</p>
+<h3 id="95-并行子代理">9.5 并行子代理<a class="header-anchor" href="#95-并行子代理">#</a></h3>
+<pre><code class="language-javascript">// 单条消息中多个 Agent 调用 = 并行执行
+[
+  Agent({ description: &quot;搜索 API 文档&quot;, ... }),
+  Agent({ description: &quot;检查测试覆盖&quot;, ... }),
+  Agent({ description: &quot;分析依赖关系&quot;, ... })
+]
+</code></pre>
+<h3 id="96-worktree-隔离">9.6 Worktree 隔离<a class="header-anchor" href="#96-worktree-隔离">#</a></h3>
+<pre><code class="language-javascript">Agent({
+  isolation: &quot;worktree&quot;,  // 创建临时 git worktree
+  prompt: &quot;...&quot;
+})
+</code></pre>
+<ul>
+<li>子代理在隔离的 worktree 工作，不影响主工作目录</li>
+<li>若代理无修改，worktree 自动清理</li>
+<li>若有修改，返回 worktree 路径和分支名</li>
+</ul>
+<hr />
+<h2 id="10-claudemd-配置层级">10. CLAUDE.md 配置层级<a class="header-anchor" href="#10-claudemd-配置层级">#</a></h2>
+<h3 id="101-文件查找顺序">10.1 文件查找顺序<a class="header-anchor" href="#101-文件查找顺序">#</a></h3>
+<pre><code>启动时工作目录：/Users/panbk/projects/myapp/src/components/
+
+加载顺序（从根到叶）：
+1. ~/.claude/CLAUDE.md
+2. /Users/panbk/projects/myapp/.claude/CLAUDE.md
+3. /Users/panbk/projects/myapp/CLAUDE.md
+4. /Users/panbk/projects/myapp/src/CLAUDE.md
+5. /Users/panbk/projects/myapp/src/components/CLAUDE.md
+</code></pre>
+<h3 id="102-动态加载">10.2 动态加载<a class="header-anchor" href="#102-动态加载">#</a></h3>
+<p>子目录中的 CLAUDE.md 在模型读取该目录文件时动态载入，无需预先扫描全部路径。</p>
+<h3 id="103-import-机制">10.3 <code>@import</code> 机制<a class="header-anchor" href="#103-import-机制">#</a></h3>
+<pre><code class="language-markdown">&lt;!-- CLAUDE.md --&gt;
+@.claude/backend-guidelines.md
+@.claude/security-rules.md
+</code></pre>
+<p>支持从 CLAUDE.md 引入其他文档，模块化管理大型项目规则。</p>
+<hr />
+<h2 id="11-prompt-缓存prompt-cache">11. Prompt 缓存（Prompt Cache）<a class="header-anchor" href="#11-prompt-缓存prompt-cache">#</a></h2>
+<h3 id="111-缓存机制">11.1 缓存机制<a class="header-anchor" href="#111-缓存机制">#</a></h3>
+<p>Anthropic API 对<strong>前缀相同的 token 序列</strong>进行缓存。缓存 TTL 为 <strong>5 分钟</strong>。</p>
+<pre><code>带缓存的请求 token 结构：
+[system prompt（稳定）] [历史消息（稳定）] [新消息（变化）]
+        ↑ 缓存命中             ↑ 缓存命中       ↑ 不缓存
+</code></pre>
+<h3 id="112-对-claude-code-的影响">11.2 对 Claude Code 的影响<a class="header-anchor" href="#112-对-claude-code-的影响">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>缓存状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>连续对话，5分钟内</td>
+<td>历史消息缓存命中，成本↓速度↑</td>
+</tr>
+<tr>
+<td>5分钟后继续</td>
+<td>缓存失效，全量处理</td>
+</tr>
+<tr>
+<td><code>/compact</code> 压缩后</td>
+<td>缓存失效（消息结构变化）</td>
+</tr>
+<tr>
+<td>子代理调用</td>
+<td>独立缓存上下文</td>
+</tr>
+</tbody>
+</table>
+<h3 id="113-schedulewakeup-与缓存的关系">11.3 ScheduleWakeup 与缓存的关系<a class="header-anchor" href="#113-schedulewakeup-与缓存的关系">#</a></h3>
+<p>在 <code>/loop</code> 动态循环中，<code>ScheduleWakeup</code> 的 <code>delaySeconds</code> 选择与缓存直接相关：</p>
+<ul>
+<li><strong>&lt; 300s（5分钟）</strong>：缓存保持热态，响应更快更便宜</li>
+<li><strong>300s</strong>：最差选择（缓存刚失效，又不够长来分摊开销）</li>
+<li><strong>&gt; 300s</strong>：缓存冷启动，适合无需频繁检查的长等待</li>
+</ul>
+<hr />
+<h2 id="12-调度与定时任务cron-schedule">12. 调度与定时任务（Cron / Schedule）<a class="header-anchor" href="#12-调度与定时任务cron-schedule">#</a></h2>
+<h3 id="121-croncreate">12.1 CronCreate<a class="header-anchor" href="#121-croncreate">#</a></h3>
+<pre><code class="language-javascript">// 需要先用 ToolSearch(&quot;select:CronCreate&quot;) 加载 schema
+CronCreate({
+  schedule: &quot;0 9 * * 1-5&quot;,  // 标准 cron 表达式
+  prompt: &quot;检查 CI 状态并报告&quot;,
+  name: &quot;daily-ci-check&quot;
+})
+</code></pre>
+<p>创建<strong>远程定时代理</strong>，在指定时间触发独立的 Claude Code 会话。</p>
+<h3 id="122-loop-动态循环">12.2 /loop 动态循环<a class="header-anchor" href="#122-loop-动态循环">#</a></h3>
+<pre><code>/loop [interval] [command]
+</code></pre>
+<ul>
+<li>无 interval 时：模型自主决定下次唤醒时间（调用 <code>ScheduleWakeup</code>）</li>
+<li>每次唤醒：重新执行相同 prompt，保持循环</li>
+<li>结束循环：不调用 <code>ScheduleWakeup</code> 即退出</li>
+</ul>
+<h3 id="123-schedule-skill">12.3 /schedule Skill<a class="header-anchor" href="#123-schedule-skill">#</a></h3>
+<p>通过 <code>schedule</code> Skill 管理远程触发器（RemoteTrigger），与 CronCreate 的区别在于：</p>
+<ul>
+<li>CronCreate：基于时间触发</li>
+<li>RemoteTrigger：基于事件触发（webhook等）</li>
+</ul>
+<hr />
+<h2 id="13-任务跟踪系统task-system">13. 任务跟踪系统（Task System）<a class="header-anchor" href="#13-任务跟踪系统task-system">#</a></h2>
+<h3 id="131-task-生命周期">13.1 Task 生命周期<a class="header-anchor" href="#131-task-生命周期">#</a></h3>
+<pre><code>TaskCreate → TaskGet → TaskUpdate(status: &quot;in_progress&quot;)
+  → 实际工作 →  TaskUpdate(status: &quot;completed&quot;)
+</code></pre>
+<h3 id="132-task-状态">13.2 Task 状态<a class="header-anchor" href="#132-task-状态">#</a></h3>
+<pre><code>pending → in_progress → completed
+                      → failed
+                      → cancelled
+</code></pre>
+<h3 id="133-后台-task">13.3 后台 Task<a class="header-anchor" href="#133-后台-task">#</a></h3>
+<pre><code class="language-javascript">Bash({ command: &quot;npm run build&quot;, run_in_background: true })
+// → 立即返回，Claude 继续其他工作
+// → 构建完成时通知 Claude
+// → 用 TaskOutput 读取输出
+</code></pre>
+<h3 id="134-使用原则">13.4 使用原则<a class="header-anchor" href="#134-使用原则">#</a></h3>
+<ul>
+<li>Task 用于<strong>当前会话</strong>的进度跟踪</li>
+<li>每完成一步立即更新状态（不批量处理）</li>
+<li>不用于跨会话持久化（用 Memory 代替）</li>
+</ul>
+<hr />
+<h2 id="14-模型选择与-fast-mode">14. 模型选择与 Fast Mode<a class="header-anchor" href="#14-模型选择与-fast-mode">#</a></h2>
+<h3 id="141-当前可用模型">14.1 当前可用模型<a class="header-anchor" href="#141-当前可用模型">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>模型 ID</th>
+<th>别名</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>claude-opus-4-7</code></td>
+<td>opus</td>
+<td>最强推理能力</td>
+</tr>
+<tr>
+<td><code>claude-sonnet-4-6</code></td>
+<td>sonnet</td>
+<td>平衡性能（默认）</td>
+</tr>
+<tr>
+<td><code>claude-haiku-4-5-20251001</code></td>
+<td>haiku</td>
+<td>速度优先</td>
+</tr>
+</tbody>
+</table>
+<h3 id="142-fast-mode">14.2 Fast Mode<a class="header-anchor" href="#142-fast-mode">#</a></h3>
+<ul>
+<li>命令：<code>/fast</code> 切换</li>
+<li>仅在 Opus 4.6 上可用（加速输出，<strong>不</strong>降级到更小模型）</li>
+<li>适用于需要 Opus 能力但希望更快响应的场景</li>
+</ul>
+<h3 id="143-子代理模型选择">14.3 子代理模型选择<a class="header-anchor" href="#143-子代理模型选择">#</a></h3>
+<pre><code class="language-javascript">Agent({
+  model: &quot;haiku&quot;,  // 探索任务用便宜快速模型
+  prompt: &quot;列出所有 TypeScript 文件...&quot;
+})
+
+Agent({
+  model: &quot;opus&quot;,   // 复杂推理用强模型
+  prompt: &quot;分析这段算法的时间复杂度...&quot;
+})
+</code></pre>
+<hr />
+<h2 id="15-会话标识符与持久化">15. 会话标识符与持久化<a class="header-anchor" href="#15-会话标识符与持久化">#</a></h2>
+<h3 id="151-session-id">15.1 Session ID<a class="header-anchor" href="#151-session-id">#</a></h3>
+<p>每次 Claude Code 启动分配唯一 session ID，用于：</p>
+<ul>
+<li><code>--resume &lt;session-id&gt;</code> 恢复历史会话</li>
+<li>日志关联</li>
+<li>子代理会话隔离</li>
+</ul>
+<h3 id="152-会话文件存储">15.2 会话文件存储<a class="header-anchor" href="#152-会话文件存储">#</a></h3>
+<pre><code>~/.claude/
+  projects/
+    -Users-panbk-myproject/  ← 项目路径的规范化
+      memory/               ← 记忆文件
+  sessions/
+    &lt;session-id&gt;.jsonl      ← 消息历史（JSONL 格式）
+  settings.json             ← 全局配置
+  keybindings.json          ← 快捷键配置
+</code></pre>
+<h3 id="153-mcp-server-状态">15.3 MCP Server 状态<a class="header-anchor" href="#153-mcp-server-状态">#</a></h3>
+<p>MCP (Model Context Protocol) Server 在 Claude Code 进程中持久运行，跨工具调用保持连接。MCP 工具以 <code>mcp__&lt;server-name&gt;__&lt;tool-name&gt;</code> 格式出现在 Deferred Tools 列表中。</p>
+<hr />
+<h2 id="16-完整执行流程时序图">16. 完整执行流程时序图<a class="header-anchor" href="#16-完整执行流程时序图">#</a></h2>
+<pre><code>用户启动 Claude Code
+         │
+         ▼
+┌─────────────────────────────────────────────────────┐
+│                    初始化阶段                         │
+│  1. 加载 settings.json（全局+项目）                   │
+│  2. 扫描并加载 CLAUDE.md 层级                        │
+│  3. 加载 MEMORY.md（注入 system-reminder）           │
+│  4. 枚举可用工具（立即可用 + Deferred 列表）          │
+│  5. 枚举可用 Skills                                  │
+│  6. 启动 MCP Servers                                 │
+│  7. 构建初始 System Prompt                           │
+└─────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────┐
+│                    每轮对话循环                       │
+│                                                     │
+│  用户输入消息                                        │
+│    ↓                                                │
+│  Hooks: UserPromptSubmit                            │
+│    ↓                                                │
+│  构建请求：                                          │
+│    - system prompt（CLAUDE.md + MEMORY.md + Skills）│
+│    - 历史消息（或压缩摘要）                           │
+│    - 新 user 消息                                    │
+│    ↓                                                │
+│  API 调用（附 Prompt Cache）                        │
+│    ↓                                                │
+│  模型推理                                            │
+│    ↓                                                │
+│  输出解析                                            │
+│    ├── 纯文本 → 显示给用户                           │
+│    └── tool_use 块                                  │
+│          ↓                                          │
+│        权限检查                                      │
+│          ├── 允许 → 执行工具                         │
+│          │     ↓                                    │
+│          │   Hooks: PreToolUse / PostToolUse         │
+│          │     ↓                                    │
+│          │   工具执行                               │
+│          │     ↓                                    │
+│          │   返回 tool_result                       │
+│          │     ↓                                    │
+│          │   追加到消息历史，继续推理                 │
+│          │                                          │
+│          └── 拒绝 → Claude 收到拒绝信号，调整策略    │
+│                                                     │
+│  响应完成                                            │
+│    ↓                                                │
+│  Hooks: Stop                                        │
+│    ↓                                                │
+│  检查上下文使用量                                    │
+│    ├── 正常 → 等待下一轮输入                         │
+│    └── 接近限制 → 触发 Auto-compaction               │
+└─────────────────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2 id="附录关键设计决策解析">附录：关键设计决策解析<a class="header-anchor" href="#附录关键设计决策解析">#</a></h2>
+<h3 id="a-为什么-deferred-tools-而非始终加载所有工具">A. 为什么 Deferred Tools 而非始终加载所有工具？<a class="header-anchor" href="#a-为什么-deferred-tools-而非始终加载所有工具">#</a></h3>
+<p>每个工具 JSON Schema 约 200-500 tokens。20+ 个工具 = ~10K tokens/轮。延迟加载将按需付费降至仅加载实际使用的工具。</p>
+<h3 id="b-为什么子代理冷启动而非共享父上下文">B. 为什么子代理冷启动而非共享父上下文？<a class="header-anchor" href="#b-为什么子代理冷启动而非共享父上下文">#</a></h3>
+<ol>
+<li><strong>隔离性</strong>：子代理的工具调用（尤其文件修改）不污染父会话的决策树</li>
+<li><strong>并行性</strong>：共享上下文无法并行执行（需串行保证一致性）</li>
+<li><strong>成本控制</strong>：传递 200K token 的父上下文给每个子代理成本极高</li>
+</ol>
+<h3 id="c-system-reminder-为何走-user-通道而非-system">C. <code>&lt;system-reminder&gt;</code> 为何走 user 通道而非 system？<a class="header-anchor" href="#c-system-reminder-为何走-user-通道而非-system">#</a></h3>
+<ol>
+<li>System prompt 在 API 层面只有一个，而 system-reminder 需要动态、多次注入</li>
+<li>避免每轮重新构建完整 system prompt（缓存失效成本高）</li>
+<li>user 消息中的标签让模型知道这是系统信息，具有相应权威性</li>
+</ol>
+<h3 id="d-memory-系统为何用文件而非数据库">D. Memory 系统为何用文件而非数据库？<a class="header-anchor" href="#d-memory-系统为何用文件而非数据库">#</a></h3>
+<ol>
+<li>对 Claude 的工具集（Read/Write/Edit）天然友好</li>
+<li>无需额外依赖（无 SQLite/Redis）</li>
+<li>用户可直接用文本编辑器查看和修改记忆内容</li>
+<li>Git 可版本管理记忆变更历史</li>
+</ol>
+<hr />
+<p><em>文档生成时间：2026-04-18 | 适用版本：Claude Code CLI + claude-sonnet-4-6</em></p>
+  </div>
+  <footer class="doc-footer">
+    <div>源文件：<code>knowledge/ai-agent/claude-execution-mechanics.md</code></div>
+    <div>生成于：2026-05-20 03:06</div>
+  </footer>
+</article>
+<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#目录">目录</a></li>
+<li class="toc-l2"><a href="#1-会话基础架构">1. 会话基础架构</a></li>
+<li class="toc-l3"><a href="#11-消息结构">1.1 消息结构</a></li>
+<li class="toc-l3"><a href="#12-system-reminder-标签机制">1.2 &lt;system-reminder&gt; 标签机制</a></li>
+<li class="toc-l3"><a href="#13-工具调用消息结构">1.3 工具调用消息结构</a></li>
+<li class="toc-l2"><a href="#2-上下文窗口与压缩机制">2. 上下文窗口与压缩机制</a></li>
+<li class="toc-l3"><a href="#21-上下文窗口限制">2.1 上下文窗口限制</a></li>
+<li class="toc-l3"><a href="#22-自动压缩auto-compaction">2.2 自动压缩（Auto-compaction）</a></li>
+<li class="toc-l3"><a href="#23-continue-与-resume-参数">2.3 --continue 与 --resume 参数</a></li>
+<li class="toc-l2"><a href="#3-系统提示层级">3. 系统提示层级</a></li>
+<li class="toc-l2"><a href="#4-工具系统tools深度解析">4. 工具系统（Tools）深度解析</a></li>
+<li class="toc-l3"><a href="#41-工具分类">4.1 工具分类</a></li>
+<li class="toc-l3"><a href="#42-工具调用并行性">4.2 工具调用并行性</a></li>
+<li class="toc-l3"><a href="#43-bash-工具特殊行为">4.3 Bash 工具特殊行为</a></li>
+<li class="toc-l3"><a href="#44-工具结果处理">4.4 工具结果处理</a></li>
+<li class="toc-l2"><a href="#5-权限模型permission-model">5. 权限模型（Permission Model）</a></li>
+<li class="toc-l3"><a href="#51-权限层级">5.1 权限层级</a></li>
+<li class="toc-l3"><a href="#52-权限模式">5.2 权限模式</a></li>
+<li class="toc-l3"><a href="#53-settingsjson-结构示例">5.3 settings.json 结构示例</a></li>
+<li class="toc-l3"><a href="#54-权限提示流程">5.4 权限提示流程</a></li>
+<li class="toc-l2"><a href="#6-hooks-执行机制">6. Hooks 执行机制</a></li>
+<li class="toc-l3"><a href="#61-hook-类型">6.1 Hook 类型</a></li>
+<li class="toc-l3"><a href="#62-配置示例">6.2 配置示例</a></li>
+<li class="toc-l3"><a href="#63-hook-的输出反馈">6.3 Hook 的输出反馈</a></li>
+<li class="toc-l2"><a href="#7-记忆系统memory-system">7. 记忆系统（Memory System）</a></li>
+<li class="toc-l3"><a href="#71-文件结构">7.1 文件结构</a></li>
+<li class="toc-l3"><a href="#72-记忆类型">7.2 记忆类型</a></li>
+<li class="toc-l3"><a href="#73-记忆文件格式">7.3 记忆文件格式</a></li>
+<li class="toc-l3"><a href="#74-memorymd-索引机制">7.4 MEMORY.md 索引机制</a></li>
+<li class="toc-l3"><a href="#75-记忆读写流程">7.5 记忆读写流程</a></li>
+<li class="toc-l3"><a href="#76-记忆-vs-其他持久化方式对比">7.6 记忆 vs 其他持久化方式对比</a></li>
+<li class="toc-l2"><a href="#8-skill-系统">8. Skill 系统</a></li>
+<li class="toc-l3"><a href="#81-什么是-skill">8.1 什么是 Skill</a></li>
+<li class="toc-l3"><a href="#82-skill-调用流程">8.2 Skill 调用流程</a></li>
+<li class="toc-l3"><a href="#83-可用-skill-列表当前环境">8.3 可用 Skill 列表（当前环境）</a></li>
+<li class="toc-l3"><a href="#84-skill-与普通指令的区别">8.4 Skill 与普通指令的区别</a></li>
+<li class="toc-l2"><a href="#9-子代理系统sub-agent-agent-tool">9. 子代理系统（Sub-agent / Agent Tool）</a></li>
+<li class="toc-l3"><a href="#91-agent-工具基础">9.1 Agent 工具基础</a></li>
+<li class="toc-l3"><a href="#92-子代理类型">9.2 子代理类型</a></li>
+<li class="toc-l3"><a href="#93-子代理的上下文隔离">9.3 子代理的上下文隔离</a></li>
+<li class="toc-l3"><a href="#94-sendmessage-继续子代理">9.4 SendMessage 继续子代理</a></li>
+<li class="toc-l3"><a href="#95-并行子代理">9.5 并行子代理</a></li>
+<li class="toc-l3"><a href="#96-worktree-隔离">9.6 Worktree 隔离</a></li>
+<li class="toc-l2"><a href="#10-claudemd-配置层级">10. CLAUDE.md 配置层级</a></li>
+<li class="toc-l3"><a href="#101-文件查找顺序">10.1 文件查找顺序</a></li>
+<li class="toc-l3"><a href="#102-动态加载">10.2 动态加载</a></li>
+<li class="toc-l3"><a href="#103-import-机制">10.3 @import 机制</a></li>
+<li class="toc-l2"><a href="#11-prompt-缓存prompt-cache">11. Prompt 缓存（Prompt Cache）</a></li>
+<li class="toc-l3"><a href="#111-缓存机制">11.1 缓存机制</a></li>
+<li class="toc-l3"><a href="#112-对-claude-code-的影响">11.2 对 Claude Code 的影响</a></li>
+<li class="toc-l3"><a href="#113-schedulewakeup-与缓存的关系">11.3 ScheduleWakeup 与缓存的关系</a></li>
+<li class="toc-l2"><a href="#12-调度与定时任务cron-schedule">12. 调度与定时任务（Cron / Schedule）</a></li>
+<li class="toc-l3"><a href="#121-croncreate">12.1 CronCreate</a></li>
+<li class="toc-l3"><a href="#122-loop-动态循环">12.2 /loop 动态循环</a></li>
+<li class="toc-l3"><a href="#123-schedule-skill">12.3 /schedule Skill</a></li>
+<li class="toc-l2"><a href="#13-任务跟踪系统task-system">13. 任务跟踪系统（Task System）</a></li>
+<li class="toc-l3"><a href="#131-task-生命周期">13.1 Task 生命周期</a></li>
+<li class="toc-l3"><a href="#132-task-状态">13.2 Task 状态</a></li>
+<li class="toc-l3"><a href="#133-后台-task">13.3 后台 Task</a></li>
+<li class="toc-l3"><a href="#134-使用原则">13.4 使用原则</a></li>
+<li class="toc-l2"><a href="#14-模型选择与-fast-mode">14. 模型选择与 Fast Mode</a></li>
+<li class="toc-l3"><a href="#141-当前可用模型">14.1 当前可用模型</a></li>
+<li class="toc-l3"><a href="#142-fast-mode">14.2 Fast Mode</a></li>
+<li class="toc-l3"><a href="#143-子代理模型选择">14.3 子代理模型选择</a></li>
+<li class="toc-l2"><a href="#15-会话标识符与持久化">15. 会话标识符与持久化</a></li>
+<li class="toc-l3"><a href="#151-session-id">15.1 Session ID</a></li>
+<li class="toc-l3"><a href="#152-会话文件存储">15.2 会话文件存储</a></li>
+<li class="toc-l3"><a href="#153-mcp-server-状态">15.3 MCP Server 状态</a></li>
+<li class="toc-l2"><a href="#16-完整执行流程时序图">16. 完整执行流程时序图</a></li>
+<li class="toc-l2"><a href="#附录关键设计决策解析">附录：关键设计决策解析</a></li>
+<li class="toc-l3"><a href="#a-为什么-deferred-tools-而非始终加载所有工具">A. 为什么 Deferred Tools 而非始终加载所有工具？</a></li>
+<li class="toc-l3"><a href="#b-为什么子代理冷启动而非共享父上下文">B. 为什么子代理冷启动而非共享父上下文？</a></li>
+<li class="toc-l3"><a href="#c-system-reminder-为何走-user-通道而非-system">C. &lt;system-reminder&gt; 为何走 user 通道而非 system？</a></li>
+<li class="toc-l3"><a href="#d-memory-系统为何用文件而非数据库">D. Memory 系统为何用文件而非数据库？</a></li></ol></div></details></aside>
+</main>
+<script>
+(function () {
+  document.querySelectorAll('pre > code').forEach(function (codeEl) {
+    var pre = codeEl.parentElement;
+    if (!pre || pre.parentElement.classList.contains('code-wrap')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'code-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.type = 'button';
+    btn.textContent = '复制';
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(codeEl.innerText).then(function () {
+        btn.textContent = '已复制';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          btn.textContent = '复制';
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>

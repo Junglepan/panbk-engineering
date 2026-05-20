@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>小红书 MCP 架构与实现原理</title>
+  <style>
+:root {
+  color-scheme: light;
+  --bg: #f7f8fb;
+  --paper: #ffffff;
+  --text: #1f2937;
+  --text-strong: #111827;
+  --muted: #667085;
+  --line: #d9dee8;
+  --accent: #0f766e;
+  --accent-soft: #eef6f5;
+  --accent-deep: #134e4a;
+  --warn: #7c2d12;
+  --code-bg: #f1f5f9;
+  --code-block-bg: #0f172a;
+  --code-block-fg: #e5e7eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 16px;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.68;
+}
+
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 32px;
+  align-items: start;
+}
+
+main.no-toc {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1000px;
+}
+
+article {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 42px 48px;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.05);
+  min-width: 0;
+}
+
+/* Header block */
+.doc-header h1 {
+  margin: 0 0 12px;
+  font-size: 32px;
+  line-height: 1.25;
+  color: var(--text-strong);
+}
+
+.doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.doc-meta .date {
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-meta .sep {
+  color: var(--line);
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.status {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.status-complete { background: #dcfce7; color: #166534; }
+.status-wip      { background: #fef3c7; color: #92400e; }
+.status-draft    { background: #e5e7eb; color: #4b5563; }
+
+.doc-meta-extra {
+  background: var(--accent-soft);
+  border: 1px solid #d6e9e7;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 20px;
+  color: var(--accent-deep);
+  font-size: 14px;
+}
+.doc-meta-extra dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.doc-meta-extra dt {
+  font-weight: 500;
+}
+.doc-meta-extra dd {
+  margin: 0;
+}
+
+.lead {
+  font-size: 17px;
+  color: #243041;
+  border-left: 4px solid var(--accent);
+  padding: 4px 0 4px 14px;
+  margin: 16px 0 28px;
+}
+
+/* Headings inside body */
+.doc-body h2 {
+  margin: 38px 0 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 23px;
+  line-height: 1.3;
+  color: var(--text-strong);
+  scroll-margin-top: 16px;
+}
+.doc-body h3 {
+  margin: 26px 0 10px;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--accent-deep);
+  scroll-margin-top: 16px;
+}
+.doc-body h4 {
+  margin: 20px 0 8px;
+  font-size: 16px;
+  color: var(--text-strong);
+}
+
+.doc-body h2 .header-anchor,
+.doc-body h3 .header-anchor,
+.doc-body h4 .header-anchor {
+  margin-left: 8px;
+  color: var(--line);
+  text-decoration: none;
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.doc-body h2:hover .header-anchor,
+.doc-body h3:hover .header-anchor,
+.doc-body h4:hover .header-anchor {
+  opacity: 1;
+}
+
+/* Text content */
+.doc-body p { margin: 10px 0; }
+.doc-body ul, .doc-body ol { margin: 8px 0 16px 24px; padding: 0; }
+.doc-body li { margin: 4px 0; }
+.doc-body li > p { margin: 4px 0; }
+
+.doc-body blockquote {
+  border-left: 4px solid var(--line);
+  padding: 4px 0 4px 14px;
+  margin: 14px 0;
+  color: var(--muted);
+}
+
+.doc-body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 24px 0;
+}
+
+/* Inline code & code blocks */
+.doc-body code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.code-wrap {
+  position: relative;
+  margin: 14px 0;
+}
+.code-wrap pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--code-block-bg);
+  color: var(--code-block-fg);
+  line-height: 1.5;
+  font-size: 13.5px;
+}
+.code-wrap pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.code-wrap:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.copy-btn.copied { color: #86efac; }
+
+/* Tables */
+.doc-body table {
+  width: 100%;
+  margin: 14px 0 22px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.doc-body th, .doc-body td {
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  vertical-align: top;
+  text-align: left;
+}
+.doc-body th {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 500;
+}
+
+/* Admonitions (GitHub-style) */
+.admonition {
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 18px 0;
+  border: 1px solid;
+  background: #fff;
+}
+.admonition-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+.admonition-title::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.admonition > p:last-child { margin-bottom: 0; }
+.admonition > p:first-of-type { margin-top: 0; }
+
+.admonition.note      { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.admonition.tip       { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.admonition.important { background: #f5f3ff; border-color: #ddd6fe; color: #5b21b6; }
+.admonition.warning   { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.admonition.caution   { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+.admonition > p { color: var(--text); }
+
+/* Images */
+.doc-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+/* Links */
+.doc-body a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+.doc-body a:hover {
+  border-bottom-color: var(--accent);
+}
+
+/* TOC sidebar */
+aside.toc {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 16px 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+aside.toc .toc-title {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+aside.toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+aside.toc li { margin: 4px 0; }
+aside.toc a {
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border-left: 2px solid transparent;
+  line-height: 1.45;
+}
+aside.toc a:hover {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+aside.toc .toc-l3 a {
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Footer */
+.doc-footer {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.doc-footer code {
+  background: var(--code-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Narrow screens */
+@media (max-width: 980px) {
+  main {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px 12px 40px;
+  }
+  article {
+    padding: 24px 18px;
+  }
+  .doc-header h1 { font-size: 26px; }
+  .doc-body h2 { font-size: 20px; }
+  .doc-body table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  aside.toc {
+    position: static;
+    max-height: none;
+    order: -1;
+  }
+  aside.toc.collapsible {
+    padding: 0;
+  }
+  aside.toc.collapsible summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    list-style: none;
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  aside.toc.collapsible .toc-body {
+    padding: 0 16px 14px;
+  }
+  aside.toc.collapsible .toc-title { display: none; }
+}
+
+  </style>
+</head>
+<body>
+<main class="">
+<article>
+  <header class="doc-header">
+    <h1>小红书 MCP 架构与实现原理</h1>
+    <div class="doc-meta"><span class="date">2026-04-16</span>
+        <span class="tag-chip">mcp</span>
+        <span class="tag-chip">小红书</span>
+        <span class="tag-chip">架构</span>
+        <span class="status status-complete">complete</span></div>
+    <div class="doc-meta-extra"><dl><dt>来源</dt><dd>GitHub xpzouying/xiaohongshu-mcp（主实现，Go 语言，12.9k+ stars）</dd></dl></div>
+
+  </header>
+  <div class="doc-body">
+<h2 id="一项目概述">一、项目概述<a class="header-anchor" href="#一项目概述">#</a></h2>
+<p><strong>xiaohongshu-mcp</strong> 是一个 MCP（Model Context Protocol）服务器，让 Claude、Cursor、Gemini CLI 等 AI 助手可以通过自然语言直接操作小红书平台。</p>
+<p><strong>核心价值</strong>：小红书没有公开 API，该项目通过 Headless Chrome 自动化模拟真实用户操作，绕过这一限制。</p>
+<p><strong>典型使用场景</strong>：</p>
+<ul>
+<li>内容创作者自动发布图文/视频笔记</li>
+<li>批量搜索、点赞、收藏、评论</li>
+<li>监控特定话题下的帖子动态</li>
+</ul>
+<hr />
+<h2 id="二整体架构">二、整体架构<a class="header-anchor" href="#二整体架构">#</a></h2>
+<pre><code>AI 客户端 (Claude / Cursor)
+        │
+        │ MCP 协议（HTTP POST /mcp）
+        ▼
+┌────────────────────────────┐
+│      MCP Server Layer      │
+│  /mcp  ←→  /api/v1/*       │  端口 18060
+└────────────┬───────────────┘
+             │
+             ▼
+┌────────────────────────────┐
+│    XiaohongshuService      │  核心业务逻辑
+└────────────┬───────────────┘
+             │
+             ▼
+┌────────────────────────────┐
+│  Headless Chrome (go-rod)  │  浏览器自动化
+│  + Stealth 反指纹模块       │
+└────────────┬───────────────┘
+             │
+             ▼
+       小红书网页端
+</code></pre>
+<p><strong>两层并行接口</strong>：</p>
+<ul>
+<li><code>/mcp</code> —— 供 AI 客户端调用，遵循 MCP 协议</li>
+<li><code>/api/v1/*</code> —— REST 接口，用于测试或非 MCP 集成</li>
+</ul>
+<p>两个接口底层共用同一套 <code>XiaohongshuService</code> 方法。</p>
+<hr />
+<h2 id="三技术栈">三、技术栈<a class="header-anchor" href="#三技术栈">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>技术选型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>主语言</td>
+<td>Go (71%)</td>
+<td>核心服务</td>
+</tr>
+<tr>
+<td>浏览器驱动</td>
+<td>go-rod/rod</td>
+<td>Chrome DevTools Protocol</td>
+</tr>
+<tr>
+<td>反指纹</td>
+<td>go-rod/stealth</td>
+<td>绕过小红书检测</td>
+</tr>
+<tr>
+<td>替代实现</td>
+<td>Python + Playwright + fastmcp</td>
+<td>另一活跃分支</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="四关键代码结构">四、关键代码结构<a class="header-anchor" href="#四关键代码结构">#</a></h2>
+<pre><code>xiaohongshu-mcp/
+├── main.go           # 入口，服务器初始化
+├── mcp_server.go     # 注册 13 个 MCP Tool（InitMCPServer）
+├── mcp_handlers.go   # MCP 工具调用的 Handler
+├── handlers_api.go   # REST API Handler
+├── service.go        # 核心服务层
+├── browser/
+│   └── browser.go    # Headless Chrome 会话管理
+└── cookies/
+    └── cookies.go    # Cookie 序列化/反序列化
+</code></pre>
+<p><strong>两个二进制产物</strong>：</p>
+<ul>
+<li><code>xiaohongshu-login</code> —— 首次登录，扫码工具</li>
+<li><code>xiaohongshu-mcp</code> —— 主服务（MCP + REST）</li>
+</ul>
+<hr />
+<h2 id="五认证机制">五、认证机制<a class="header-anchor" href="#五认证机制">#</a></h2>
+<pre><code>首次登录：
+用户执行 xiaohongshu-login
+  → 打开浏览器窗口
+  → 用户用手机 App 扫描二维码
+  → Cookie 保存至 ~/.mcp/xiaohongshu/cookies.json
+
+后续使用：
+服务器启动时读取 cookies.json
+  → 注入到每次 Headless Chrome 会话
+  → 无需重新登录（Cookie 有效期约 7 天）
+</code></pre>
+<p><strong>注意事项</strong>：</p>
+<ul>
+<li>同一账号不能在多处 Web 端同时登录，否则 Cookie 会失效</li>
+<li>Cookie 过期时需重新扫码，但不等于账号封禁</li>
+</ul>
+<hr />
+<h2 id="六数据流全链路">六、数据流全链路<a class="header-anchor" href="#六数据流全链路">#</a></h2>
+<pre><code>1. 用户输入       → &quot;帮我搜索关于护肤的笔记&quot;
+2. LLM 翻译       → mcp0_search_feeds(keywords=&quot;护肤&quot;)
+3. MCP 请求       → HTTP POST /mcp {tool: search_feeds, params: {...}}
+4. Handler 路由   → mcp_handlers.go 分发到对应 Handler
+5. Service 调用   → XiaohongshuService.SearchFeeds()
+6. 浏览器自动化   → go-rod 开启 Headless Chrome，注入 Cookie，执行搜索
+7. 数据提取       → 解析 DOM，提取标题/封面/点赞数等结构化数据
+8. MCP 响应       → 返回 JSON 给 AI 客户端
+9. LLM 处理       → Claude 汇总结果呈现给用户
+</code></pre>
+<p><strong>关键数据依赖</strong>（重要）：</p>
+<ul>
+<li><code>feed_id</code> 和 <code>xsec_token</code> 必须通过 <code>list_feeds</code> 或 <code>search_feeds</code> 先获取</li>
+<li>点赞、评论、获取详情等操作都依赖这两个字段</li>
+<li>不能跳过发现步骤直接操作</li>
+</ul>
+<hr />
+<h2 id="七暴露的-13-个-mcp-tools">七、暴露的 13 个 MCP Tools<a class="header-anchor" href="#七暴露的-13-个-mcp-tools">#</a></h2>
+<h3 id="认证管理">认证管理<a class="header-anchor" href="#认证管理">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>check_login_status</code></td>
+<td>检查当前登录状态</td>
+</tr>
+<tr>
+<td><code>get_login_qrcode</code></td>
+<td>获取登录二维码</td>
+</tr>
+<tr>
+<td><code>delete_cookies</code></td>
+<td>清除 Cookie，重置会话</td>
+</tr>
+</tbody>
+</table>
+<h3 id="内容发布">内容发布<a class="header-anchor" href="#内容发布">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>关键参数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>publish_content</code></td>
+<td>title(≤20字), content(≤1000字), images, tags?, schedule_at?, visibility?</td>
+</tr>
+<tr>
+<td><code>publish_with_video</code></td>
+<td>title, content, video_path(MP4/MOV/AVI), images?</td>
+</tr>
+</tbody>
+</table>
+<h3 id="内容发现">内容发现<a class="header-anchor" href="#内容发现">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>list_feeds</code></td>
+<td>获取首页推荐流</td>
+</tr>
+<tr>
+<td><code>search_feeds</code></td>
+<td>关键词搜索，支持排序和类型过滤</td>
+</tr>
+</tbody>
+</table>
+<h3 id="互动操作均需-feed-id-xsec-token">互动操作（均需 feed_id + xsec_token）<a class="header-anchor" href="#互动操作均需-feed-id-xsec-token">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_feed_detail</code></td>
+<td>获取笔记详情（含评论）</td>
+</tr>
+<tr>
+<td><code>post_comment_to_feed</code></td>
+<td>发表评论</td>
+</tr>
+<tr>
+<td><code>reply_comment_in_feed</code></td>
+<td>回复指定评论</td>
+</tr>
+<tr>
+<td><code>like_feed</code></td>
+<td>点赞/取消点赞</td>
+</tr>
+<tr>
+<td><code>favorite_feed</code></td>
+<td>收藏/取消收藏</td>
+</tr>
+</tbody>
+</table>
+<h3 id="用户信息">用户信息<a class="header-anchor" href="#用户信息">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>user_profile</code></td>
+<td>获取用户主页数据</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="八多种实现对比">八、多种实现对比<a class="header-anchor" href="#八多种实现对比">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>实现</th>
+<th>语言</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>xpzouying/xiaohongshu-mcp</td>
+<td>Go</td>
+<td>最成熟，稳定运行 1 年以上</td>
+</tr>
+<tr>
+<td>luyike221/xiaohongshu-mcp-python</td>
+<td>Python</td>
+<td>异步支持，Playwright + fastmcp</td>
+</tr>
+<tr>
+<td>rednote-mcp</td>
+<td>Node.js</td>
+<td>npm 包，轻量</td>
+</tr>
+<tr>
+<td>xiaohongshu-mcp-server</td>
+<td>Python</td>
+<td>PyPI 发布，适合快速集成</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="九运营约束与最佳实践">九、运营约束与最佳实践<a class="header-anchor" href="#九运营约束与最佳实践">#</a></h2>
+<p><strong>内容限制</strong>：</p>
+<ul>
+<li>标题最多 20 字（严格限制）</li>
+<li>正文最多 1000 字</li>
+<li>建议每日发布上限 50 条</li>
+</ul>
+<p><strong>稳定性建议</strong>：</p>
+<ul>
+<li>避免并发操作同一账号</li>
+<li>Cookie 失效后及时重新登录</li>
+<li>图文内容比视频更受平台算法青睐</li>
+</ul>
+<p><strong>安全提醒</strong>：</p>
+<ul>
+<li>项目声明仅供学习研究使用</li>
+<li>存在账号风险，请勿用于非法用途</li>
+</ul>
+<hr />
+<h2 id="十与-mcp-协议的关系">十、与 MCP 协议的关系<a class="header-anchor" href="#十与-mcp-协议的关系">#</a></h2>
+<p>MCP（Model Context Protocol）是 Anthropic 提出的开放协议，定义了 AI 助手如何调用外部工具：</p>
+<ul>
+<li>AI 客户端发现服务器暴露的 Tool 列表</li>
+<li>LLM 根据用户意图选择合适 Tool 并填充参数</li>
+<li>服务器执行后返回结构化结果</li>
+<li>LLM 将结果翻译为自然语言呈现给用户</li>
+</ul>
+<p>xiaohongshu-mcp 本质上是一个 <strong>MCP 适配层</strong>，将小红书的网页操作封装成标准化 Tool 接口，让 AI 可以像调用函数一样操作社交平台。</p>
+<hr />
+<h2 id="参考资源">参考资源<a class="header-anchor" href="#参考资源">#</a></h2>
+<ul>
+<li><a href="https://github.com/xpzouying/xiaohongshu-mcp">GitHub - xpzouying/xiaohongshu-mcp</a></li>
+<li><a href="https://deepwiki.com/xpzouying/xiaohongshu-mcp">DeepWiki - 项目结构深度解析</a></li>
+<li><a href="https://skywork.ai/skypage/en/xiaohongshu-mcp-server-guide/1980054737602781184">Skywork AI - 技术深度解析</a></li>
+</ul>
+  </div>
+  <footer class="doc-footer">
+    <div>源文件：<code>knowledge/ai-agent/xiaohongshu-mcp.md</code></div>
+    <div>生成于：2026-05-20 03:06</div>
+  </footer>
+</article>
+<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#一项目概述">一、项目概述</a></li>
+<li class="toc-l2"><a href="#二整体架构">二、整体架构</a></li>
+<li class="toc-l2"><a href="#三技术栈">三、技术栈</a></li>
+<li class="toc-l2"><a href="#四关键代码结构">四、关键代码结构</a></li>
+<li class="toc-l2"><a href="#五认证机制">五、认证机制</a></li>
+<li class="toc-l2"><a href="#六数据流全链路">六、数据流全链路</a></li>
+<li class="toc-l2"><a href="#七暴露的-13-个-mcp-tools">七、暴露的 13 个 MCP Tools</a></li>
+<li class="toc-l3"><a href="#认证管理">认证管理</a></li>
+<li class="toc-l3"><a href="#内容发布">内容发布</a></li>
+<li class="toc-l3"><a href="#内容发现">内容发现</a></li>
+<li class="toc-l3"><a href="#互动操作均需-feed-id-xsec-token">互动操作（均需 feed_id + xsec_token）</a></li>
+<li class="toc-l3"><a href="#用户信息">用户信息</a></li>
+<li class="toc-l2"><a href="#八多种实现对比">八、多种实现对比</a></li>
+<li class="toc-l2"><a href="#九运营约束与最佳实践">九、运营约束与最佳实践</a></li>
+<li class="toc-l2"><a href="#十与-mcp-协议的关系">十、与 MCP 协议的关系</a></li>
+<li class="toc-l2"><a href="#参考资源">参考资源</a></li></ol></div></details></aside>
+</main>
+<script>
+(function () {
+  document.querySelectorAll('pre > code').forEach(function (codeEl) {
+    var pre = codeEl.parentElement;
+    if (!pre || pre.parentElement.classList.contains('code-wrap')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'code-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.type = 'button';
+    btn.textContent = '复制';
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(codeEl.innerText).then(function () {
+        btn.textContent = '已复制';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          btn.textContent = '复制';
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>

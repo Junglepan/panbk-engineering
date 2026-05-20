@@ -1,0 +1,1196 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>代理网络基础全景指南</title>
+  <style>
+:root {
+  color-scheme: light;
+  --bg: #f7f8fb;
+  --paper: #ffffff;
+  --text: #1f2937;
+  --text-strong: #111827;
+  --muted: #667085;
+  --line: #d9dee8;
+  --accent: #0f766e;
+  --accent-soft: #eef6f5;
+  --accent-deep: #134e4a;
+  --warn: #7c2d12;
+  --code-bg: #f1f5f9;
+  --code-block-bg: #0f172a;
+  --code-block-fg: #e5e7eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 16px;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.68;
+}
+
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 32px;
+  align-items: start;
+}
+
+main.no-toc {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1000px;
+}
+
+article {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 42px 48px;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.05);
+  min-width: 0;
+}
+
+/* Header block */
+.doc-header h1 {
+  margin: 0 0 12px;
+  font-size: 32px;
+  line-height: 1.25;
+  color: var(--text-strong);
+}
+
+.doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.doc-meta .date {
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-meta .sep {
+  color: var(--line);
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.status {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.status-complete { background: #dcfce7; color: #166534; }
+.status-wip      { background: #fef3c7; color: #92400e; }
+.status-draft    { background: #e5e7eb; color: #4b5563; }
+
+.doc-meta-extra {
+  background: var(--accent-soft);
+  border: 1px solid #d6e9e7;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 20px;
+  color: var(--accent-deep);
+  font-size: 14px;
+}
+.doc-meta-extra dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.doc-meta-extra dt {
+  font-weight: 500;
+}
+.doc-meta-extra dd {
+  margin: 0;
+}
+
+.lead {
+  font-size: 17px;
+  color: #243041;
+  border-left: 4px solid var(--accent);
+  padding: 4px 0 4px 14px;
+  margin: 16px 0 28px;
+}
+
+/* Headings inside body */
+.doc-body h2 {
+  margin: 38px 0 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 23px;
+  line-height: 1.3;
+  color: var(--text-strong);
+  scroll-margin-top: 16px;
+}
+.doc-body h3 {
+  margin: 26px 0 10px;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--accent-deep);
+  scroll-margin-top: 16px;
+}
+.doc-body h4 {
+  margin: 20px 0 8px;
+  font-size: 16px;
+  color: var(--text-strong);
+}
+
+.doc-body h2 .header-anchor,
+.doc-body h3 .header-anchor,
+.doc-body h4 .header-anchor {
+  margin-left: 8px;
+  color: var(--line);
+  text-decoration: none;
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.doc-body h2:hover .header-anchor,
+.doc-body h3:hover .header-anchor,
+.doc-body h4:hover .header-anchor {
+  opacity: 1;
+}
+
+/* Text content */
+.doc-body p { margin: 10px 0; }
+.doc-body ul, .doc-body ol { margin: 8px 0 16px 24px; padding: 0; }
+.doc-body li { margin: 4px 0; }
+.doc-body li > p { margin: 4px 0; }
+
+.doc-body blockquote {
+  border-left: 4px solid var(--line);
+  padding: 4px 0 4px 14px;
+  margin: 14px 0;
+  color: var(--muted);
+}
+
+.doc-body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 24px 0;
+}
+
+/* Inline code & code blocks */
+.doc-body code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.code-wrap {
+  position: relative;
+  margin: 14px 0;
+}
+.code-wrap pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--code-block-bg);
+  color: var(--code-block-fg);
+  line-height: 1.5;
+  font-size: 13.5px;
+}
+.code-wrap pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.code-wrap:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.copy-btn.copied { color: #86efac; }
+
+/* Tables */
+.doc-body table {
+  width: 100%;
+  margin: 14px 0 22px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.doc-body th, .doc-body td {
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  vertical-align: top;
+  text-align: left;
+}
+.doc-body th {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 500;
+}
+
+/* Admonitions (GitHub-style) */
+.admonition {
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 18px 0;
+  border: 1px solid;
+  background: #fff;
+}
+.admonition-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+.admonition-title::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.admonition > p:last-child { margin-bottom: 0; }
+.admonition > p:first-of-type { margin-top: 0; }
+
+.admonition.note      { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.admonition.tip       { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.admonition.important { background: #f5f3ff; border-color: #ddd6fe; color: #5b21b6; }
+.admonition.warning   { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.admonition.caution   { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+.admonition > p { color: var(--text); }
+
+/* Images */
+.doc-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+/* Links */
+.doc-body a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+.doc-body a:hover {
+  border-bottom-color: var(--accent);
+}
+
+/* TOC sidebar */
+aside.toc {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 16px 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+aside.toc .toc-title {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+aside.toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+aside.toc li { margin: 4px 0; }
+aside.toc a {
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border-left: 2px solid transparent;
+  line-height: 1.45;
+}
+aside.toc a:hover {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+aside.toc .toc-l3 a {
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Footer */
+.doc-footer {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.doc-footer code {
+  background: var(--code-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Narrow screens */
+@media (max-width: 980px) {
+  main {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px 12px 40px;
+  }
+  article {
+    padding: 24px 18px;
+  }
+  .doc-header h1 { font-size: 26px; }
+  .doc-body h2 { font-size: 20px; }
+  .doc-body table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  aside.toc {
+    position: static;
+    max-height: none;
+    order: -1;
+  }
+  aside.toc.collapsible {
+    padding: 0;
+  }
+  aside.toc.collapsible summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    list-style: none;
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  aside.toc.collapsible .toc-body {
+    padding: 0 16px 14px;
+  }
+  aside.toc.collapsible .toc-title { display: none; }
+}
+
+  </style>
+</head>
+<body>
+<main class="">
+<article>
+  <header class="doc-header">
+    <h1>代理网络基础全景指南</h1>
+    <div class="doc-meta"><span class="date">2026-05-16</span>
+        <span class="tag-chip">代理</span>
+        <span class="tag-chip">网络</span>
+        <span class="tag-chip">v2ray</span>
+        <span class="tag-chip">clash</span>
+        <span class="status status-complete">complete</span></div>
+    <div class="doc-meta-extra"><dl><dt>适用对象</dt><dd>已经有梯子/机场环境，但希望真正理解“自己在用什么”的新手</dd><dt>产出形式</dt><dd>概念文档 + SVG 配图</dd><dt>构图参考</dt><dd>JimLiu/baoyu-skills 中 baoyu-infographic 的“布局类型 × 视觉风格”思路，以及 baoyu-diagram 的结构图、流程图、直觉图取向</dd></dl></div>
+
+  </header>
+  <div class="doc-body">
+<h2 id="0-先用一句话建立整体认知">0. 先用一句话建立整体认知<a class="header-anchor" href="#0-先用一句话建立整体认知">#</a></h2>
+<p>科学上网不是一个单独软件，也不是一个神秘按钮，而是一套网络转发方案：</p>
+<pre><code class="language-text">你的电脑/手机
+  -&gt; 客户端
+  -&gt; 节点
+  -&gt; 目标网站
+</code></pre>
+<p>更完整一点：</p>
+<pre><code class="language-text">机场提供订阅
+订阅里面有很多节点
+客户端导入订阅并连接节点
+你的流量通过节点转发到目标网站
+目标网站看到的是节点的出口 IP
+</code></pre>
+<p>核心关系图：</p>
+<p><img src="assets/01-relationship-map.svg" alt="科学上网核心概念关系图" /></p>
+<hr />
+<h2 id="1-术语速查表">1. 术语速查表<a class="header-anchor" href="#1-术语速查表">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>名词</th>
+<th>小白解释</th>
+<th>更准确的理解</th>
+<th>你日常会怎么遇到</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>梯子</td>
+<td>科学上网工具的俗称</td>
+<td>一套代理访问方案</td>
+<td>“我的梯子能不能上 ChatGPT？”</td>
+</tr>
+<tr>
+<td>代理</td>
+<td>中转服务器机制</td>
+<td>请求先到代理，再由代理访问目标</td>
+<td>浏览器/终端走 <code>127.0.0.1:7890</code></td>
+</tr>
+<tr>
+<td>客户端</td>
+<td>本机连接工具</td>
+<td>管理节点、规则、端口、Tun、DNS</td>
+<td>Clash、v2rayN、Shadowrocket</td>
+</tr>
+<tr>
+<td>机场</td>
+<td>节点服务商</td>
+<td>提供订阅、节点、套餐、面板</td>
+<td>买套餐、看剩余流量</td>
+</tr>
+<tr>
+<td>订阅</td>
+<td>节点配置链接</td>
+<td>一个 URL，里面包含节点列表</td>
+<td>导入客户端、更新订阅</td>
+</tr>
+<tr>
+<td>节点</td>
+<td>代理服务器</td>
+<td>真正帮你出国访问网站的服务器</td>
+<td>香港节点、日本节点、美国节点</td>
+</tr>
+<tr>
+<td>VPS</td>
+<td>云服务器</td>
+<td>可用来自建节点的基础设施</td>
+<td>Vultr、AWS、Oracle Cloud</td>
+</tr>
+<tr>
+<td>协议</td>
+<td>客户端和节点的通信方式</td>
+<td>SS、VLESS、Trojan、Hysteria2 等</td>
+<td>订阅里自动带着</td>
+</tr>
+<tr>
+<td>分流</td>
+<td>哪些流量走代理，哪些直连</td>
+<td>规则模式/全局模式/直连模式</td>
+<td>国内网站直连，国外网站代理</td>
+</tr>
+<tr>
+<td>Tun</td>
+<td>接管系统网络的模式</td>
+<td>让不支持系统代理的软件也能走代理</td>
+<td>游戏、终端、Docker 常用</td>
+</tr>
+<tr>
+<td>链式代理</td>
+<td>代理后面再接代理</td>
+<td>多跳路径</td>
+<td><code>你 -&gt; 节点 A -&gt; 节点 B -&gt; 网站</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-什么是代理">2. 什么是代理<a class="header-anchor" href="#2-什么是代理">#</a></h2>
+<p>代理就是“中间人服务器”。</p>
+<p>没有代理时：</p>
+<pre><code class="language-text">你 -&gt; 网站
+</code></pre>
+<p>使用代理后：</p>
+<pre><code class="language-text">你 -&gt; 代理服务器 -&gt; 网站
+</code></pre>
+<p>这会产生几个重要效果：</p>
+<ul>
+<li>目标网站看到的是代理服务器的 IP，不是你本机网络的出口 IP。</li>
+<li>你的设备只需要能连上代理服务器，后面的访问由代理服务器完成。</li>
+<li>代理服务器在哪里，你通常就表现为哪个地区的访问者。</li>
+</ul>
+<p>例如你连了日本节点：</p>
+<pre><code class="language-text">你在中国大陆
+  -&gt; 日本节点
+  -&gt; YouTube / Google / ChatGPT
+</code></pre>
+<p>目标网站一般会看到“日本 IP 正在访问”。</p>
+<h3 id="代理不等于绝对匿名">代理不等于绝对匿名<a class="header-anchor" href="#代理不等于绝对匿名">#</a></h3>
+<p>代理能改变出口路径，但不能保证绝对匿名。以下信息仍可能暴露或被关联：</p>
+<ul>
+<li>登录账号本身</li>
+<li>浏览器指纹</li>
+<li>Cookie</li>
+<li>DNS 或 WebRTC 泄露</li>
+<li>机场服务商日志策略</li>
+<li>目标网站对节点 IP 的风控记录</li>
+</ul>
+<p>所以代理更准确地说是“改变网络出口和转发路径”，不是“万能隐身”。</p>
+<hr />
+<h2 id="3-什么是梯子">3. 什么是梯子<a class="header-anchor" href="#3-什么是梯子">#</a></h2>
+<p>“梯子”是中文网络语，通常指能帮助访问国际互联网服务的一整套工具和配置。</p>
+<p>它通常由这些部分组成：</p>
+<pre><code class="language-text">梯子
+= 客户端
++ 订阅
++ 节点
++ 协议
++ 分流规则
++ DNS 配置
+</code></pre>
+<p>所以当别人说“我有一个梯子”，可能指的是：</p>
+<ul>
+<li>他买了一个机场套餐；</li>
+<li>他拿到了一个订阅链接；</li>
+<li>他把订阅导入了 Clash、v2rayN、Shadowrocket 等客户端；</li>
+<li>他选择某个节点后，可以访问 Google、YouTube、ChatGPT 等服务。</li>
+</ul>
+<p>严格来说，“梯子”不是一个具体技术名词，而是对整套代理使用环境的俗称。</p>
+<hr />
+<h2 id="4-什么是客户端">4. 什么是客户端<a class="header-anchor" href="#4-什么是客户端">#</a></h2>
+<p>客户端是你设备上真正操作梯子的地方。</p>
+<p>常见客户端：</p>
+<table>
+<thead>
+<tr>
+<th>平台</th>
+<th>常见客户端</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows</td>
+<td>Clash Verge Rev、v2rayN、NekoRay</td>
+</tr>
+<tr>
+<td>macOS</td>
+<td>Clash Verge Rev、ClashX Meta、Surge</td>
+</tr>
+<tr>
+<td>iOS</td>
+<td>Shadowrocket、Quantumult X、Stash、Surge</td>
+</tr>
+<tr>
+<td>Android</td>
+<td>v2rayNG、Clash Meta for Android、NekoBox</td>
+</tr>
+<tr>
+<td>Linux</td>
+<td>Mihomo、Clash Verge Rev、NekoRay</td>
+</tr>
+</tbody>
+</table>
+<p>客户端负责：</p>
+<ul>
+<li>导入机场订阅；</li>
+<li>展示节点列表；</li>
+<li>选择节点；</li>
+<li>启动本地代理端口；</li>
+<li>控制系统代理；</li>
+<li>提供规则模式、全局模式、直连模式；</li>
+<li>处理 DNS；</li>
+<li>开启 Tun 模式；</li>
+<li>统计连接、延迟和流量。</li>
+</ul>
+<h3 id="本地代理端口是什么意思">本地代理端口是什么意思<a class="header-anchor" href="#本地代理端口是什么意思">#</a></h3>
+<p>很多客户端会在你电脑上开一个本地端口，例如：</p>
+<pre><code class="language-text">127.0.0.1:7890
+127.0.0.1:10808
+</code></pre>
+<p><code>127.0.0.1</code> 代表“你自己的电脑”。端口代表客户端监听的位置。</p>
+<p>当浏览器或终端配置为使用这个端口时，请求会先交给客户端：</p>
+<pre><code class="language-text">浏览器 / 终端
+  -&gt; 127.0.0.1:7890
+  -&gt; 客户端
+  -&gt; 远程节点
+  -&gt; 目标网站
+</code></pre>
+<p>结合你之前的使用习惯，你的终端环境里曾经出现过 <code>10808</code> 和 <code>7890</code> 两类本地端口。它们不是“两个机场”，而是本机不同代理入口。真正通往外网的是客户端后面选中的远程节点。</p>
+<hr />
+<h2 id="5-什么是机场">5. 什么是机场<a class="header-anchor" href="#5-什么是机场">#</a></h2>
+<p>机场是提供代理节点的服务商。</p>
+<p>你可以把机场理解成：</p>
+<pre><code class="language-text">机场 = 节点供应商 + 用户面板 + 流量套餐 + 订阅系统
+</code></pre>
+<p>机场通常提供：</p>
+<ul>
+<li>多个地区节点；</li>
+<li>一个订阅链接；</li>
+<li>每月流量额度；</li>
+<li>节点倍率；</li>
+<li>在线面板；</li>
+<li>流媒体解锁节点；</li>
+<li>ChatGPT / TikTok / Netflix 等特定用途节点；</li>
+<li>工单、公告和续费入口。</li>
+</ul>
+<p>机场不是客户端。机场也不是一个具体节点。</p>
+<p>更准确的关系是：</p>
+<pre><code class="language-text">机场给你订阅链接
+订阅链接里包含节点配置
+客户端导入订阅
+你在客户端里选择节点
+</code></pre>
+<hr />
+<h2 id="6-什么是订阅">6. 什么是订阅<a class="header-anchor" href="#6-什么是订阅">#</a></h2>
+<p>订阅通常是一个 URL。</p>
+<p>形式可能类似：</p>
+<pre><code class="language-text">https://example.com/api/v1/client/subscribe?token=xxxxxxxx
+</code></pre>
+<p>它里面包含你的节点配置。你不需要手动复制每个节点的服务器地址、端口、密码、协议，只要把订阅导入客户端即可。</p>
+<h3 id="订阅链接很敏感">订阅链接很敏感<a class="header-anchor" href="#订阅链接很敏感">#</a></h3>
+<p>订阅链接相当于你机场账号的“钥匙”之一。</p>
+<p>泄露后别人可能：</p>
+<ul>
+<li>导入你的节点；</li>
+<li>消耗你的流量；</li>
+<li>导致你的账号异常；</li>
+<li>让机场误判为多人共享。</li>
+</ul>
+<p>如果订阅泄露，应该去机场面板重置订阅链接。</p>
+<hr />
+<h2 id="7-什么是节点">7. 什么是节点<a class="header-anchor" href="#7-什么是节点">#</a></h2>
+<p>节点就是代理服务器。</p>
+<p>日常看到的“香港 01”“日本东京”“美国洛杉矶”“新加坡 IEPL”都属于节点。</p>
+<p>一个节点一般包含：</p>
+<ul>
+<li>服务器地址；</li>
+<li>端口；</li>
+<li>协议；</li>
+<li>密码或 UUID；</li>
+<li>加密方式；</li>
+<li>传输层配置；</li>
+<li>SNI / Host / 伪装域名；</li>
+<li>是否支持 UDP；</li>
+<li>倍率；</li>
+<li>地区标签。</li>
+</ul>
+<p>小白不需要手动理解每个字段。正常情况下，机场订阅会自动把这些配置交给客户端。</p>
+<h3 id="怎么选节点">怎么选节点<a class="header-anchor" href="#怎么选节点">#</a></h3>
+<p>常见选择逻辑：</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>推荐节点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>日常网页、搜索、ChatGPT</td>
+<td>香港、日本、新加坡、台湾、美国节点都可测试</td>
+</tr>
+<tr>
+<td>YouTube、Netflix</td>
+<td>优先速度稳定、支持流媒体解锁的节点</td>
+</tr>
+<tr>
+<td>游戏</td>
+<td>优先低延迟、低丢包节点</td>
+</tr>
+<tr>
+<td>下载</td>
+<td>优先低倍率、高带宽节点</td>
+</tr>
+<tr>
+<td>开发下载 GitHub/npm</td>
+<td>优先稳定节点，不一定最低延迟</td>
+</tr>
+<tr>
+<td>TikTok</td>
+<td>常需要对应地区节点和移动端环境配合</td>
+</tr>
+</tbody>
+</table>
+<p>不要只看延迟。延迟低不代表一定快，也不代表一定能解锁目标服务。</p>
+<hr />
+<h2 id="8-什么是协议">8. 什么是协议<a class="header-anchor" href="#8-什么是协议">#</a></h2>
+<p>协议是客户端和节点之间“说话的规则”。</p>
+<p>常见协议包括：</p>
+<ul>
+<li>Shadowsocks，简称 SS；</li>
+<li>VMess；</li>
+<li>VLESS；</li>
+<li>Trojan；</li>
+<li>Hysteria2；</li>
+<li>TUIC；</li>
+<li>WireGuard；</li>
+<li>SOCKS5；</li>
+<li>HTTP Proxy。</li>
+</ul>
+<p>类比：</p>
+<pre><code class="language-text">客户端和节点之间要通信
+协议就是它们共同使用的语言
+</code></pre>
+<p>你通常不需要手动选择协议。机场订阅里已经配好了，只要客户端支持对应协议即可。</p>
+<hr />
+<h2 id="9-什么是-vps">9. 什么是 VPS<a class="header-anchor" href="#9-什么是-vps">#</a></h2>
+<p>VPS 是 Virtual Private Server，虚拟专用服务器。</p>
+<p>它是一台你租来的云服务器。常见云服务商包括：</p>
+<ul>
+<li>Vultr；</li>
+<li>DigitalOcean；</li>
+<li>Linode；</li>
+<li>AWS；</li>
+<li>Google Cloud；</li>
+<li>Oracle Cloud；</li>
+<li>Hetzner；</li>
+<li>搬瓦工等。</li>
+</ul>
+<p>VPS 本身不是梯子，但你可以在 VPS 上部署代理服务，让它变成一个节点。</p>
+<p>关系可以这样理解：</p>
+<pre><code class="language-text">VPS = 原材料
+节点 = 在 VPS 或服务器上搭好的代理服务
+机场 = 批量提供节点的服务商
+客户端 = 你本机连接节点的软件
+</code></pre>
+<h3 id="机场和自建-vps-的区别">机场和自建 VPS 的区别<a class="header-anchor" href="#机场和自建-vps-的区别">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>买机场</td>
+<td>简单、节点多、维护少</td>
+<td>依赖服务商、共享环境、隐私取决于机场</td>
+</tr>
+<tr>
+<td>自建 VPS</td>
+<td>自己控制、独享资源、逻辑清楚</td>
+<td>要懂服务器、地区少、IP 被封要自己处理</td>
+</tr>
+</tbody>
+</table>
+<p>对纯小白来说，建议先理解机场和客户端，再考虑 VPS 自建。</p>
+<hr />
+<h2 id="10-什么是链式代理">10. 什么是链式代理<a class="header-anchor" href="#10-什么是链式代理">#</a></h2>
+<p>普通代理：</p>
+<pre><code class="language-text">你 -&gt; 节点 A -&gt; 网站
+</code></pre>
+<p>链式代理：</p>
+<pre><code class="language-text">你 -&gt; 节点 A -&gt; 节点 B -&gt; 网站
+</code></pre>
+<p>路径对比图：</p>
+<p><img src="assets/02-traffic-paths.svg" alt="直连、普通代理和链式代理路径对比" /></p>
+<p>链式代理的常见用途：</p>
+<ul>
+<li>让一个代理作为入口，另一个代理作为出口；</li>
+<li>公司/校园代理后面再接机场；</li>
+<li>本地工具只能连 SOCKS5，于是先连本地代理，再转到远程节点；</li>
+<li>特殊网络环境下绕过某个限制；</li>
+<li>需要固定最终出口地区。</li>
+</ul>
+<p>缺点：</p>
+<ul>
+<li>更慢；</li>
+<li>延迟更高；</li>
+<li>掉线概率更高；</li>
+<li>DNS、UDP、证书、规则问题更难查；</li>
+<li>小白容易不知道请求到底从哪里出去。</li>
+</ul>
+<p>建议：没有明确需求时，不要优先使用链式代理。先把普通代理跑稳定。</p>
+<hr />
+<h2 id="11-系统代理规则模式全局模式直连模式tun">11. 系统代理、规则模式、全局模式、直连模式、Tun<a class="header-anchor" href="#11-系统代理规则模式全局模式直连模式tun">#</a></h2>
+<h3 id="系统代理">系统代理<a class="header-anchor" href="#系统代理">#</a></h3>
+<p>系统代理是操作系统提供给应用的代理设置。</p>
+<p>开启后，大多数遵守系统代理的软件会走客户端。</p>
+<p>但有些软件不听系统代理，例如：</p>
+<ul>
+<li>某些游戏；</li>
+<li>某些命令行程序；</li>
+<li>Docker；</li>
+<li>部分开发工具；</li>
+<li>某些 Electron 应用。</li>
+</ul>
+<h3 id="规则模式">规则模式<a class="header-anchor" href="#规则模式">#</a></h3>
+<p>规则模式是最适合日常使用的模式。</p>
+<p>它大概这样工作：</p>
+<pre><code class="language-text">国内网站 -&gt; 直连
+国外网站 -&gt; 代理
+广告域名 -&gt; 拦截
+局域网地址 -&gt; 直连
+</code></pre>
+<p>优点：</p>
+<ul>
+<li>国内网站速度快；</li>
+<li>国外网站可访问；</li>
+<li>不容易让所有流量都绕远路；</li>
+<li>更符合日常使用。</li>
+</ul>
+<h3 id="全局模式">全局模式<a class="header-anchor" href="#全局模式">#</a></h3>
+<p>全局模式会让大部分流量都走代理。</p>
+<p>适合排查问题：</p>
+<pre><code class="language-text">规则模式打不开
+切全局后能打开
+说明很可能是分流规则或 DNS 问题
+</code></pre>
+<p>不建议长期无脑全局，因为国内服务可能变慢，甚至触发异常登录风控。</p>
+<h3 id="直连模式">直连模式<a class="header-anchor" href="#直连模式">#</a></h3>
+<p>直连模式就是全部不走代理。</p>
+<p>适合测试本地网络是否正常。</p>
+<h3 id="tun-模式">Tun 模式<a class="header-anchor" href="#tun-模式">#</a></h3>
+<p>Tun 模式比系统代理更强，它会在网络层接管流量。</p>
+<p>适合：</p>
+<ul>
+<li>游戏；</li>
+<li>终端；</li>
+<li>Docker；</li>
+<li>不支持系统代理的软件；</li>
+<li>需要更完整接管网络的场景。</li>
+</ul>
+<p>风险：</p>
+<ul>
+<li>可能影响局域网访问；</li>
+<li>可能和公司 VPN 冲突；</li>
+<li>可能导致 DNS 行为变化；</li>
+<li>配错时会让网络表现更混乱。</li>
+</ul>
+<p>建议：浏览器能用时，先别急着开 Tun。只有当“某个软件不走代理”时，再考虑 Tun。</p>
+<hr />
+<h2 id="12-dns-为什么重要">12. DNS 为什么重要<a class="header-anchor" href="#12-dns-为什么重要">#</a></h2>
+<p>DNS 负责把域名翻译成 IP。</p>
+<p>例如：</p>
+<pre><code class="language-text">google.com -&gt; 某个 IP 地址
+</code></pre>
+<p>科学上网里 DNS 很重要，因为：</p>
+<ul>
+<li>DNS 可能被污染；</li>
+<li>国内外解析结果可能不同；</li>
+<li>分流规则需要根据域名判断走代理还是直连；</li>
+<li>某些网站依赖正确地区的 DNS 结果；</li>
+<li>错误 DNS 会导致“节点通，但网站不通”。</li>
+</ul>
+<p>常见现象：</p>
+<ul>
+<li>Google 打不开，但 Telegram 能用；</li>
+<li>某些网站跳到奇怪页面；</li>
+<li>ChatGPT 页面能开，但接口报错；</li>
+<li>节点测速正常，但浏览器打不开网页。</li>
+</ul>
+<p>建议：</p>
+<ul>
+<li>小白优先使用客户端默认 DNS 配置；</li>
+<li>不要同时在系统、浏览器、客户端里乱改 DNS；</li>
+<li>排查时可以用“规则模式 vs 全局模式”判断是否是规则/DNS 问题。</li>
+</ul>
+<hr />
+<h2 id="13-流量倍率延迟速度丢包">13. 流量、倍率、延迟、速度、丢包<a class="header-anchor" href="#13-流量倍率延迟速度丢包">#</a></h2>
+<h3 id="流量">流量<a class="header-anchor" href="#流量">#</a></h3>
+<p>机场套餐通常按流量计费。</p>
+<p>例如每月 100GB，意思是你通过节点转发的数据总量有额度。</p>
+<h3 id="倍率">倍率<a class="header-anchor" href="#倍率">#</a></h3>
+<p>倍率决定流量扣除速度。</p>
+<pre><code class="language-text">1x：使用 1GB，扣 1GB
+2x：使用 1GB，扣 2GB
+0.5x：使用 1GB，扣 0.5GB
+</code></pre>
+<p>高倍率节点不一定更好，但经常代表线路更贵或更稀缺。</p>
+<h3 id="延迟">延迟<a class="header-anchor" href="#延迟">#</a></h3>
+<p>延迟是你到节点的响应时间，单位通常是 ms。</p>
+<p>一般规律：</p>
+<ul>
+<li>香港、日本、新加坡对中国大陆延迟较低；</li>
+<li>美国、欧洲延迟较高；</li>
+<li>游戏和实时通话更看重延迟。</li>
+</ul>
+<h3 id="速度">速度<a class="header-anchor" href="#速度">#</a></h3>
+<p>速度决定看视频、下载文件是否流畅。</p>
+<p>速度和延迟不是一回事。一个节点延迟低，但带宽可能很差。</p>
+<h3 id="丢包">丢包<a class="header-anchor" href="#丢包">#</a></h3>
+<p>丢包是数据传输过程中丢失。</p>
+<p>丢包高时会出现：</p>
+<ul>
+<li>视频卡顿；</li>
+<li>网页加载到一半；</li>
+<li>游戏延迟突然飘；</li>
+<li>SSH 或下载中断。</li>
+</ul>
+<hr />
+<h2 id="14-针对你的使用场景已有梯子环境怎么理解和使用">14. 针对你的使用场景：已有梯子环境怎么理解和使用<a class="header-anchor" href="#14-针对你的使用场景已有梯子环境怎么理解和使用">#</a></h2>
+<p>结合你已有的环境，重点关注三层：</p>
+<pre><code class="language-text">第一层：客户端有没有正常运行
+第二层：本地代理端口是否对应正确
+第三层：远程节点是否适合当前目标
+</code></pre>
+<p>你之前的知识文档里已经记录过终端代理端口切换习惯：</p>
+<pre><code class="language-bash">proxy_status
+proxy_on
+proxy_7890
+proxy_off
+</code></pre>
+<p>这说明你的使用场景不只是浏览器，还包括终端下载、npm、GitHub、curl 等开发场景。</p>
+<h3 id="浏览器使用建议">浏览器使用建议<a class="header-anchor" href="#浏览器使用建议">#</a></h3>
+<p>推荐：</p>
+<ul>
+<li>客户端使用规则模式；</li>
+<li>节点先选香港、日本、新加坡；</li>
+<li>ChatGPT 不通时换美国、日本、新加坡节点；</li>
+<li>YouTube 卡顿时换速度更高或低倍率节点；</li>
+<li>不要频繁改 DNS。</li>
+</ul>
+<h3 id="终端使用建议">终端使用建议<a class="header-anchor" href="#终端使用建议">#</a></h3>
+<p>终端不会天然知道你的客户端在哪里。它通常靠环境变量走代理：</p>
+<pre><code class="language-bash">HTTP_PROXY=http://127.0.0.1:7890
+HTTPS_PROXY=http://127.0.0.1:7890
+ALL_PROXY=socks5://127.0.0.1:7890
+</code></pre>
+<p>如果你的客户端实际监听的是 <code>10808</code>，但终端指向 <code>7890</code>，就会失败。</p>
+<p>所以终端排查先看：</p>
+<pre><code class="language-bash">proxy_status
+</code></pre>
+<p>然后确认：</p>
+<ul>
+<li>当前环境变量指向哪个端口；</li>
+<li>客户端是否真的开了这个端口；</li>
+<li>当前节点是否可用；</li>
+<li>目标站是否需要特定地区节点。</li>
+</ul>
+<h3 id="开发下载场景建议">开发下载场景建议<a class="header-anchor" href="#开发下载场景建议">#</a></h3>
+<p>例如 GitHub、npm、bun、pip、Docker 拉取失败时，先不要急着换软件源。</p>
+<p>按顺序查：</p>
+<ol>
+<li>浏览器能不能打开目标网站；</li>
+<li>终端代理变量是否正确；</li>
+<li>当前端口是否可用；</li>
+<li>当前节点是否可用；</li>
+<li>换 <code>7890</code> 或 <code>10808</code>；</li>
+<li>换节点；</li>
+<li>再考虑软件源或证书问题。</li>
+</ol>
+<hr />
+<h2 id="15-新手排查流程">15. 新手排查流程<a class="header-anchor" href="#15-新手排查流程">#</a></h2>
+<p>打不开网站时，不要同时乱改节点、DNS、规则、Tun。按顺序排查：</p>
+<p><img src="assets/03-troubleshooting-flow.svg" alt="科学上网问题排查流程图" /></p>
+<p>文字版：</p>
+<ol>
+<li>客户端是否运行？</li>
+<li>系统代理是否开启？</li>
+<li>本地代理端口是否正确？</li>
+<li>当前节点是否可用？</li>
+<li>是否只有某个网站打不开？</li>
+<li>切全局模式是否能打开？</li>
+<li>换节点是否能打开？</li>
+<li>目标软件是否不听系统代理？</li>
+<li>是否需要 Tun 或终端环境变量？</li>
+</ol>
+<h3 id="快速测试命令">快速测试命令<a class="header-anchor" href="#快速测试命令">#</a></h3>
+<p>测试某个本地 HTTP 代理端口：</p>
+<pre><code class="language-bash">curl -I --proxy http://127.0.0.1:7890 https://www.google.com
+</code></pre>
+<p>测试另一个端口：</p>
+<pre><code class="language-bash">curl -I --proxy http://127.0.0.1:10808 https://www.google.com
+</code></pre>
+<p>如果 <code>7890</code> 通而 <code>10808</code> 不通，说明问题可能在端口配置或客户端监听上。<br />
+如果两个都不通，先确认客户端是否运行、节点是否连通。<br />
+如果 Google 通但某个网站不通，可能是目标网站屏蔽节点、DNS、规则或账号风控。</p>
+<hr />
+<h2 id="16-常见误区">16. 常见误区<a class="header-anchor" href="#16-常见误区">#</a></h2>
+<h3 id="误区-1机场就是客户端">误区 1：机场就是客户端<a class="header-anchor" href="#误区-1机场就是客户端">#</a></h3>
+<p>不是。机场是服务商，客户端是你本机软件。</p>
+<h3 id="误区-2节点延迟最低就最好">误区 2：节点延迟最低就最好<a class="header-anchor" href="#误区-2节点延迟最低就最好">#</a></h3>
+<p>不一定。看视频更看速度，游戏更看低延迟和低丢包，ChatGPT 更看出口 IP 是否干净。</p>
+<h3 id="误区-3全局模式一定更好">误区 3：全局模式一定更好<a class="header-anchor" href="#误区-3全局模式一定更好">#</a></h3>
+<p>不一定。全局适合排查，日常更推荐规则模式。</p>
+<h3 id="误区-4开了客户端所有软件都会走代理">误区 4：开了客户端，所有软件都会走代理<a class="header-anchor" href="#误区-4开了客户端所有软件都会走代理">#</a></h3>
+<p>不一定。有的软件不听系统代理，需要 Tun 或单独配置代理。</p>
+<h3 id="误区-5vps-一定比机场好">误区 5：VPS 一定比机场好<a class="header-anchor" href="#误区-5vps-一定比机场好">#</a></h3>
+<p>不一定。VPS 更可控，但维护成本高，节点少，IP 被封需要自己处理。</p>
+<h3 id="误区-6链式代理更高级所以应该一直开">误区 6：链式代理更高级，所以应该一直开<a class="header-anchor" href="#误区-6链式代理更高级所以应该一直开">#</a></h3>
+<p>不建议。链式代理增加复杂度，除非你知道自己为什么需要它。</p>
+<hr />
+<h2 id="17-一张最终记忆图">17. 一张最终记忆图<a class="header-anchor" href="#17-一张最终记忆图">#</a></h2>
+<pre><code class="language-text">机场
+  提供订阅链接
+      ↓
+订阅
+  包含多个节点配置
+      ↓
+客户端
+  导入订阅、选择节点、启动本地端口
+      ↓
+代理
+  把你的流量转发给远程节点
+      ↓
+节点
+  作为出口访问目标网站
+      ↓
+网站
+  看到节点 IP
+</code></pre>
+<p>如果是自建：</p>
+<pre><code class="language-text">你租 VPS
+  -&gt; 在 VPS 上搭代理服务
+  -&gt; 得到一个自建节点
+  -&gt; 导入客户端
+  -&gt; 使用方式和机场节点类似
+</code></pre>
+<p>如果是链式代理：</p>
+<pre><code class="language-text">你
+  -&gt; 客户端
+  -&gt; 节点 A
+  -&gt; 节点 B
+  -&gt; 网站
+</code></pre>
+<hr />
+<h2 id="18-最小行动建议">18. 最小行动建议<a class="header-anchor" href="#18-最小行动建议">#</a></h2>
+<p>对你当前阶段，建议这样用：</p>
+<ol>
+<li>日常浏览：客户端开规则模式，选择香港/日本/新加坡节点。</li>
+<li>ChatGPT 不通：优先换美国、日本、新加坡、台湾节点。</li>
+<li>YouTube 卡：换低倍率高速度节点，不只看延迟。</li>
+<li>终端下载失败：先执行 <code>proxy_status</code>，确认端口和客户端一致。</li>
+<li>某个软件不走代理：再考虑 Tun，不要一开始就开很多高级功能。</li>
+<li>想理解更深：再学习 VPS 自建、DNS 策略、链式代理、规则集。</li>
+</ol>
+<hr />
+<h2 id="19-参考来源与构图说明">19. 参考来源与构图说明<a class="header-anchor" href="#19-参考来源与构图说明">#</a></h2>
+<ul>
+<li><code>JimLiu/baoyu-skills</code> README：其 <code>baoyu-infographic</code> 强调用多种布局类型和视觉风格生成信息图；<code>baoyu-diagram</code> 强调生成 SVG 流程图、结构图、序列/协议图和直觉图，并将输出做成自包含 SVG。</li>
+<li>本文配图据此采用三种结构：
+<ul>
+<li>关系图：解释概念之间“谁提供谁、谁使用谁”；</li>
+<li>路径图：解释直连、普通代理、链式代理的差异；</li>
+<li>排障流程图：解释小白遇到问题时的判断顺序。</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2 id="20-文件清单">20. 文件清单<a class="header-anchor" href="#20-文件清单">#</a></h2>
+<pre><code class="language-text">panbk-agent-knowledge/
+  proxy-network-basics/
+    README.md
+    assets/
+      01-relationship-map.svg
+      02-traffic-paths.svg
+      03-troubleshooting-flow.svg
+</code></pre>
+  </div>
+  <footer class="doc-footer">
+    <div>源文件：<code>knowledge/networking/proxy-basics/README.md</code></div>
+    <div>生成于：2026-05-20 03:06</div>
+  </footer>
+</article>
+<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#0-先用一句话建立整体认知">0. 先用一句话建立整体认知</a></li>
+<li class="toc-l2"><a href="#1-术语速查表">1. 术语速查表</a></li>
+<li class="toc-l2"><a href="#2-什么是代理">2. 什么是代理</a></li>
+<li class="toc-l3"><a href="#代理不等于绝对匿名">代理不等于绝对匿名</a></li>
+<li class="toc-l2"><a href="#3-什么是梯子">3. 什么是梯子</a></li>
+<li class="toc-l2"><a href="#4-什么是客户端">4. 什么是客户端</a></li>
+<li class="toc-l3"><a href="#本地代理端口是什么意思">本地代理端口是什么意思</a></li>
+<li class="toc-l2"><a href="#5-什么是机场">5. 什么是机场</a></li>
+<li class="toc-l2"><a href="#6-什么是订阅">6. 什么是订阅</a></li>
+<li class="toc-l3"><a href="#订阅链接很敏感">订阅链接很敏感</a></li>
+<li class="toc-l2"><a href="#7-什么是节点">7. 什么是节点</a></li>
+<li class="toc-l3"><a href="#怎么选节点">怎么选节点</a></li>
+<li class="toc-l2"><a href="#8-什么是协议">8. 什么是协议</a></li>
+<li class="toc-l2"><a href="#9-什么是-vps">9. 什么是 VPS</a></li>
+<li class="toc-l3"><a href="#机场和自建-vps-的区别">机场和自建 VPS 的区别</a></li>
+<li class="toc-l2"><a href="#10-什么是链式代理">10. 什么是链式代理</a></li>
+<li class="toc-l2"><a href="#11-系统代理规则模式全局模式直连模式tun">11. 系统代理、规则模式、全局模式、直连模式、Tun</a></li>
+<li class="toc-l3"><a href="#系统代理">系统代理</a></li>
+<li class="toc-l3"><a href="#规则模式">规则模式</a></li>
+<li class="toc-l3"><a href="#全局模式">全局模式</a></li>
+<li class="toc-l3"><a href="#直连模式">直连模式</a></li>
+<li class="toc-l3"><a href="#tun-模式">Tun 模式</a></li>
+<li class="toc-l2"><a href="#12-dns-为什么重要">12. DNS 为什么重要</a></li>
+<li class="toc-l2"><a href="#13-流量倍率延迟速度丢包">13. 流量、倍率、延迟、速度、丢包</a></li>
+<li class="toc-l3"><a href="#流量">流量</a></li>
+<li class="toc-l3"><a href="#倍率">倍率</a></li>
+<li class="toc-l3"><a href="#延迟">延迟</a></li>
+<li class="toc-l3"><a href="#速度">速度</a></li>
+<li class="toc-l3"><a href="#丢包">丢包</a></li>
+<li class="toc-l2"><a href="#14-针对你的使用场景已有梯子环境怎么理解和使用">14. 针对你的使用场景：已有梯子环境怎么理解和使用</a></li>
+<li class="toc-l3"><a href="#浏览器使用建议">浏览器使用建议</a></li>
+<li class="toc-l3"><a href="#终端使用建议">终端使用建议</a></li>
+<li class="toc-l3"><a href="#开发下载场景建议">开发下载场景建议</a></li>
+<li class="toc-l2"><a href="#15-新手排查流程">15. 新手排查流程</a></li>
+<li class="toc-l3"><a href="#快速测试命令">快速测试命令</a></li>
+<li class="toc-l2"><a href="#16-常见误区">16. 常见误区</a></li>
+<li class="toc-l3"><a href="#误区-1机场就是客户端">误区 1：机场就是客户端</a></li>
+<li class="toc-l3"><a href="#误区-2节点延迟最低就最好">误区 2：节点延迟最低就最好</a></li>
+<li class="toc-l3"><a href="#误区-3全局模式一定更好">误区 3：全局模式一定更好</a></li>
+<li class="toc-l3"><a href="#误区-4开了客户端所有软件都会走代理">误区 4：开了客户端，所有软件都会走代理</a></li>
+<li class="toc-l3"><a href="#误区-5vps-一定比机场好">误区 5：VPS 一定比机场好</a></li>
+<li class="toc-l3"><a href="#误区-6链式代理更高级所以应该一直开">误区 6：链式代理更高级，所以应该一直开</a></li>
+<li class="toc-l2"><a href="#17-一张最终记忆图">17. 一张最终记忆图</a></li>
+<li class="toc-l2"><a href="#18-最小行动建议">18. 最小行动建议</a></li>
+<li class="toc-l2"><a href="#19-参考来源与构图说明">19. 参考来源与构图说明</a></li>
+<li class="toc-l2"><a href="#20-文件清单">20. 文件清单</a></li></ol></div></details></aside>
+</main>
+<script>
+(function () {
+  document.querySelectorAll('pre > code').forEach(function (codeEl) {
+    var pre = codeEl.parentElement;
+    if (!pre || pre.parentElement.classList.contains('code-wrap')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'code-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.type = 'button';
+    btn.textContent = '复制';
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(codeEl.innerText).then(function () {
+        btn.textContent = '已复制';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          btn.textContent = '复制';
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>

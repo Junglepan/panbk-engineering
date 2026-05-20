@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>V2RayN 与 Claude OAuth 冲突排查复盘</title>
+  <style>
+:root {
+  color-scheme: light;
+  --bg: #f7f8fb;
+  --paper: #ffffff;
+  --text: #1f2937;
+  --text-strong: #111827;
+  --muted: #667085;
+  --line: #d9dee8;
+  --accent: #0f766e;
+  --accent-soft: #eef6f5;
+  --accent-deep: #134e4a;
+  --warn: #7c2d12;
+  --code-bg: #f1f5f9;
+  --code-block-bg: #0f172a;
+  --code-block-fg: #e5e7eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 16px;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.68;
+}
+
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 32px;
+  align-items: start;
+}
+
+main.no-toc {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1000px;
+}
+
+article {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 42px 48px;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.05);
+  min-width: 0;
+}
+
+/* Header block */
+.doc-header h1 {
+  margin: 0 0 12px;
+  font-size: 32px;
+  line-height: 1.25;
+  color: var(--text-strong);
+}
+
+.doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.doc-meta .date {
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-meta .sep {
+  color: var(--line);
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.status {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.status-complete { background: #dcfce7; color: #166534; }
+.status-wip      { background: #fef3c7; color: #92400e; }
+.status-draft    { background: #e5e7eb; color: #4b5563; }
+
+.doc-meta-extra {
+  background: var(--accent-soft);
+  border: 1px solid #d6e9e7;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 20px;
+  color: var(--accent-deep);
+  font-size: 14px;
+}
+.doc-meta-extra dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.doc-meta-extra dt {
+  font-weight: 500;
+}
+.doc-meta-extra dd {
+  margin: 0;
+}
+
+.lead {
+  font-size: 17px;
+  color: #243041;
+  border-left: 4px solid var(--accent);
+  padding: 4px 0 4px 14px;
+  margin: 16px 0 28px;
+}
+
+/* Headings inside body */
+.doc-body h2 {
+  margin: 38px 0 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 23px;
+  line-height: 1.3;
+  color: var(--text-strong);
+  scroll-margin-top: 16px;
+}
+.doc-body h3 {
+  margin: 26px 0 10px;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--accent-deep);
+  scroll-margin-top: 16px;
+}
+.doc-body h4 {
+  margin: 20px 0 8px;
+  font-size: 16px;
+  color: var(--text-strong);
+}
+
+.doc-body h2 .header-anchor,
+.doc-body h3 .header-anchor,
+.doc-body h4 .header-anchor {
+  margin-left: 8px;
+  color: var(--line);
+  text-decoration: none;
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.doc-body h2:hover .header-anchor,
+.doc-body h3:hover .header-anchor,
+.doc-body h4:hover .header-anchor {
+  opacity: 1;
+}
+
+/* Text content */
+.doc-body p { margin: 10px 0; }
+.doc-body ul, .doc-body ol { margin: 8px 0 16px 24px; padding: 0; }
+.doc-body li { margin: 4px 0; }
+.doc-body li > p { margin: 4px 0; }
+
+.doc-body blockquote {
+  border-left: 4px solid var(--line);
+  padding: 4px 0 4px 14px;
+  margin: 14px 0;
+  color: var(--muted);
+}
+
+.doc-body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 24px 0;
+}
+
+/* Inline code & code blocks */
+.doc-body code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.code-wrap {
+  position: relative;
+  margin: 14px 0;
+}
+.code-wrap pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--code-block-bg);
+  color: var(--code-block-fg);
+  line-height: 1.5;
+  font-size: 13.5px;
+}
+.code-wrap pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.code-wrap:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.copy-btn.copied { color: #86efac; }
+
+/* Tables */
+.doc-body table {
+  width: 100%;
+  margin: 14px 0 22px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.doc-body th, .doc-body td {
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  vertical-align: top;
+  text-align: left;
+}
+.doc-body th {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 500;
+}
+
+/* Admonitions (GitHub-style) */
+.admonition {
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 18px 0;
+  border: 1px solid;
+  background: #fff;
+}
+.admonition-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+.admonition-title::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.admonition > p:last-child { margin-bottom: 0; }
+.admonition > p:first-of-type { margin-top: 0; }
+
+.admonition.note      { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.admonition.tip       { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.admonition.important { background: #f5f3ff; border-color: #ddd6fe; color: #5b21b6; }
+.admonition.warning   { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.admonition.caution   { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+.admonition > p { color: var(--text); }
+
+/* Images */
+.doc-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+/* Links */
+.doc-body a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+.doc-body a:hover {
+  border-bottom-color: var(--accent);
+}
+
+/* TOC sidebar */
+aside.toc {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 16px 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+aside.toc .toc-title {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+aside.toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+aside.toc li { margin: 4px 0; }
+aside.toc a {
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border-left: 2px solid transparent;
+  line-height: 1.45;
+}
+aside.toc a:hover {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+aside.toc .toc-l3 a {
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Footer */
+.doc-footer {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.doc-footer code {
+  background: var(--code-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Narrow screens */
+@media (max-width: 980px) {
+  main {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px 12px 40px;
+  }
+  article {
+    padding: 24px 18px;
+  }
+  .doc-header h1 { font-size: 26px; }
+  .doc-body h2 { font-size: 20px; }
+  .doc-body table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  aside.toc {
+    position: static;
+    max-height: none;
+    order: -1;
+  }
+  aside.toc.collapsible {
+    padding: 0;
+  }
+  aside.toc.collapsible summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    list-style: none;
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  aside.toc.collapsible .toc-body {
+    padding: 0 16px 14px;
+  }
+  aside.toc.collapsible .toc-title { display: none; }
+}
+
+  </style>
+</head>
+<body>
+<main class="">
+<article>
+  <header class="doc-header">
+    <h1>V2RayN 与 Claude OAuth 冲突排查复盘</h1>
+    <div class="doc-meta"><span class="date">2026-04-11</span>
+        <span class="tag-chip">v2ray</span>
+        <span class="tag-chip">claude-code</span>
+        <span class="tag-chip">oauth</span>
+        <span class="tag-chip">故障复盘</span>
+        <span class="status status-complete">complete</span></div>
+
+
+  </header>
+  <div class="doc-body">
+<h2 id="1-事件摘要">1. 事件摘要<a class="header-anchor" href="#1-事件摘要">#</a></h2>
+<p>本次故障并非单点问题，而是「代理端口配置」「本地网关配置」「OAuth 回调链路」叠加导致。</p>
+<p>主要报错：</p>
+<ul>
+<li><code>Unable to connect to API (UND_ERR_SOCKET)</code></li>
+<li><code>401 Invalid API key</code></li>
+<li><code>OAuth error: protocol mismatch</code></li>
+</ul>
+<p>核心结论：</p>
+<ul>
+<li><code>UND_ERR_SOCKET</code> 是网络层（socket）问题。</li>
+<li><code>401</code> 是认证层问题。</li>
+<li><code>protocol mismatch</code> 是 OAuth 回调协议链路问题，通常与本地网关/代理改写有关。</li>
+</ul>
+<h2 id="2-错误类型与定位结果">2. 错误类型与定位结果<a class="header-anchor" href="#2-错误类型与定位结果">#</a></h2>
+<h3 id="21-und-err-socket">2.1 <code>UND_ERR_SOCKET</code><a class="header-anchor" href="#21-und-err-socket">#</a></h3>
+<p>含义：Claude 进程到目标地址（代理或 API）建连失败。</p>
+<p>本次证据：</p>
+<ul>
+<li>环境变量曾指向 <code>127.0.0.1:7890</code></li>
+<li>但本机实际监听的是 <code>127.0.0.1:10808</code>（v2rayN）</li>
+</ul>
+<p>因此：配置指向了不存在的代理端口，导致 socket 失败。</p>
+<h3 id="22-401-invalid-api-key">2.2 <code>401 Invalid API key</code><a class="header-anchor" href="#22-401-invalid-api-key">#</a></h3>
+<p>含义：HTTP 请求到了服务端，但鉴权失败。</p>
+<p>本次高关联因素：</p>
+<ul>
+<li>曾存在 <code>ANTHROPIC_BASE_URL=http://127.0.0.1:3456</code></li>
+<li>请求被改写到本地网关链路，鉴权行为不再是“官方直连默认路径”</li>
+</ul>
+<p>因此：即使代理连通，也可能在网关层触发鉴权失败。</p>
+<h3 id="23-oauth-error-protocol-mismatch">2.3 <code>OAuth error: protocol mismatch</code><a class="header-anchor" href="#23-oauth-error-protocol-mismatch">#</a></h3>
+<p>含义：OAuth 授权/回调的协议（http/https）或回调通道不一致。</p>
+<p>本次高关联因素：</p>
+<ul>
+<li><code>ANTHROPIC_BASE_URL</code> 指向本地 <code>http://127.0.0.1:3456</code></li>
+<li>本地回调若被代理或网关处理不当，易出现协议不匹配</li>
+<li>缺失/错误的 <code>NO_PROXY</code> 会增加本地回调被代理劫持概率</li>
+</ul>
+<h2 id="3-配置与链路变化前后对比">3. 配置与链路变化（前后对比）<a class="header-anchor" href="#3-配置与链路变化前后对比">#</a></h2>
+<h2 id="31-claude-配置演化">3.1 Claude 配置演化<a class="header-anchor" href="#31-claude-配置演化">#</a></h2>
+<p>历史快照（<code>~/.claude/file-history/.../55ba...</code>）：</p>
+<ul>
+<li><code>v1</code>：</li>
+</ul>
+<pre><code class="language-json">{
+  &quot;env&quot;: {},
+  &quot;includeCoAuthoredBy&quot;: false
+}
+</code></pre>
+<ul>
+<li><code>v2</code>（关键变更）：</li>
+</ul>
+<pre><code class="language-json">{
+  &quot;env&quot;: {
+    &quot;ANTHROPIC_BASE_URL&quot;: &quot;http://127.0.0.1:3456&quot;
+  },
+  &quot;model&quot;: &quot;gpt-5-codex&quot;,
+  &quot;permissions&quot;: { ... }
+}
+</code></pre>
+<ul>
+<li><code>v3</code>：仍保留 <code>ANTHROPIC_BASE_URL</code>，去掉了 <code>model</code>。</li>
+</ul>
+<p>当前配置（已修正）：</p>
+<ul>
+<li>文件：<code>~/.claude/settings.json</code></li>
+<li>关键项：
+<ul>
+<li><code>model = claude-sonnet-4-6</code></li>
+<li>无 <code>ANTHROPIC_BASE_URL</code></li>
+<li>保留安全 permissions</li>
+</ul>
+</li>
+</ul>
+<h2 id="32-shell-代理配置演化">3.2 Shell 代理配置演化<a class="header-anchor" href="#32-shell-代理配置演化">#</a></h2>
+<p>早期：固定 7890（但你实际使用 v2rayN 10808）</p>
+<pre><code class="language-bash">http_proxy/https_proxy/all_proxy -&gt; 127.0.0.1:7890
+</code></pre>
+<p>当前（已修正）：</p>
+<ul>
+<li>文件：<code>~/.zshrc</code></li>
+<li>基于 v2rayN 实际 inbound 设置为 10808（mixed）</li>
+</ul>
+<pre><code class="language-bash">http_proxy/https_proxy/HTTP_PROXY/HTTPS_PROXY = http://127.0.0.1:10808
+all_proxy/ALL_PROXY = socks5://127.0.0.1:10808
+NO_PROXY/no_proxy = localhost,127.0.0.1,::1
+unset ANTHROPIC_BASE_URL
+</code></pre>
+<h2 id="33-链路变化图">3.3 链路变化图<a class="header-anchor" href="#33-链路变化图">#</a></h2>
+<h3 id="故障链路不稳定">故障链路（不稳定）<a class="header-anchor" href="#故障链路不稳定">#</a></h3>
+<p>Claude -&gt; <code>ANTHROPIC_BASE_URL(http://127.0.0.1:3456)</code> -&gt; 本地网关 -&gt; 外网</p>
+<p>风险：</p>
+<ul>
+<li>依赖本地网关实现与状态</li>
+<li>OAuth 回调更容易出现协议/重定向不一致</li>
+</ul>
+<h3 id="修复后链路稳定">修复后链路（稳定）<a class="header-anchor" href="#修复后链路稳定">#</a></h3>
+<p>Claude -&gt; <code>api.anthropic.com</code>（官方）</p>
+<p>出站通过 v2rayN：</p>
+<ul>
+<li>HTTP(S) 代理：<code>127.0.0.1:10808</code></li>
+<li>SOCKS 代理：<code>127.0.0.1:10808</code></li>
+</ul>
+<p>本地回调绕过代理：</p>
+<ul>
+<li><code>NO_PROXY=localhost,127.0.0.1,::1</code></li>
+</ul>
+<h2 id="4-本次具体修改清单">4. 本次具体修改清单<a class="header-anchor" href="#4-本次具体修改清单">#</a></h2>
+<ol>
+<li>删除 <code>~/.claude/settings.json</code> 中的 <code>ANTHROPIC_BASE_URL</code></li>
+<li>将 <code>model</code> 明确为 <code>claude-sonnet-4-6</code></li>
+<li>将 <code>.zshrc</code> 代理固定到 v2rayN 实际端口 <code>10808</code></li>
+<li>同时导出大小写代理变量（兼容不同 CLI/库）</li>
+<li>增加 <code>NO_PROXY/no_proxy</code> 保护 OAuth 本地回调</li>
+<li>清理旧端口 <code>7890</code> 作为默认入口的配置依赖</li>
+</ol>
+<h2 id="5-为什么你可以用-v2rayn-使用-claude">5. 为什么你可以用 v2rayN 使用 Claude<a class="header-anchor" href="#5-为什么你可以用-v2rayn-使用-claude">#</a></h2>
+<p>原因是你的 v2rayN 当前 inbound 配置为：</p>
+<ul>
+<li><code>protocol = mixed</code></li>
+<li><code>listen = 127.0.0.1</code></li>
+<li><code>port = 10808</code></li>
+</ul>
+<p><code>mixed</code> 入口可同时承接 HTTP 与 SOCKS5，因此：</p>
+<ul>
+<li><code>http_proxy/https_proxy -&gt; http://127.0.0.1:10808</code> 可用</li>
+<li><code>all_proxy -&gt; socks5://127.0.0.1:10808</code> 也可用</li>
+</ul>
+<p>这就是当前“同一端口兼容两套代理变量”的基础。</p>
+<h2 id="6-为什么之前看起来一直能用">6. 为什么之前“看起来一直能用”<a class="header-anchor" href="#6-为什么之前看起来一直能用">#</a></h2>
+<p>因为当时你运行在另一条链路：</p>
+<ul>
+<li>Claude 请求先打到本地 <code>3456</code> 网关（<code>ANTHROPIC_BASE_URL</code>）</li>
+<li>只要该网关短期内状态正常，就会“看起来可用”</li>
+</ul>
+<p>但这条链路对环境变化很敏感：</p>
+<ul>
+<li>网关状态、代理状态、OAuth 回调策略任一变化，都可能触发异常</li>
+<li>所以表现为“之前正常，后来突然不行”</li>
+</ul>
+<h2 id="7-当前修改的长期影响">7. 当前修改的长期影响<a class="header-anchor" href="#7-当前修改的长期影响">#</a></h2>
+<p>正向影响：</p>
+<ul>
+<li>链路更简单（去掉本地网关层）</li>
+<li>故障面更小，排障成本降低</li>
+<li>与 v2rayN 当前真实配置一致，降低端口错配概率</li>
+<li>OAuth 回调更稳定（<code>NO_PROXY</code> 生效）</li>
+</ul>
+<p>注意事项：</p>
+<ul>
+<li>若未来 v2rayN 改端口（不是 10808），需同步改 <code>.zshrc</code></li>
+<li>若你未来确实需要本地 API 网关（3456），应单独管理该模式，不要与 OAuth 登录链路混用</li>
+</ul>
+<h2 id="8-推荐运行规范以后避免复发">8. 推荐运行规范（以后避免复发）<a class="header-anchor" href="#8-推荐运行规范以后避免复发">#</a></h2>
+<ol>
+<li>固定一个常用代理端口并版本化记录（当前为 10808）</li>
+<li>不在日常配置中保留 <code>ANTHROPIC_BASE_URL</code>（除非明确进入网关模式）</li>
+<li>永远保留 <code>NO_PROXY=localhost,127.0.0.1,::1</code></li>
+<li>每次异常按分层排查：</li>
+</ol>
+<ul>
+<li><code>UND_ERR_SOCKET</code> -&gt; 先查端口监听与代理变量</li>
+<li><code>401</code> -&gt; 查鉴权来源与登录态</li>
+<li><code>protocol mismatch</code> -&gt; 查 OAuth 回调是否被代理/网关改写</li>
+</ul>
+<h2 id="9-快速自检命令">9. 快速自检命令<a class="header-anchor" href="#9-快速自检命令">#</a></h2>
+<pre><code class="language-bash"># 1) 看代理环境
+env | rg -i '^(http_proxy|https_proxy|all_proxy|HTTP_PROXY|HTTPS_PROXY|ALL_PROXY|NO_PROXY|no_proxy|ANTHROPIC_BASE_URL)='
+
+# 2) 看 v2rayN 端口是否监听
+lsof -nP -iTCP -sTCP:LISTEN | rg '127.0.0.1:(10808|10809|7890|7891)'
+
+# 3) 看 Claude 登录状态
+claude auth status
+
+# 4) 测试 Anthropic 可达性（通过当前代理）
+curl -I --max-time 12 https://api.anthropic.com
+</code></pre>
+  </div>
+  <footer class="doc-footer">
+    <div>源文件：<code>knowledge/incidents/v2rayn-oauth-2026-04-11.md</code></div>
+    <div>生成于：2026-05-20 03:06</div>
+  </footer>
+</article>
+<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#1-事件摘要">1. 事件摘要</a></li>
+<li class="toc-l2"><a href="#2-错误类型与定位结果">2. 错误类型与定位结果</a></li>
+<li class="toc-l3"><a href="#21-und-err-socket">2.1 UND_ERR_SOCKET</a></li>
+<li class="toc-l3"><a href="#22-401-invalid-api-key">2.2 401 Invalid API key</a></li>
+<li class="toc-l3"><a href="#23-oauth-error-protocol-mismatch">2.3 OAuth error: protocol mismatch</a></li>
+<li class="toc-l2"><a href="#3-配置与链路变化前后对比">3. 配置与链路变化（前后对比）</a></li>
+<li class="toc-l2"><a href="#31-claude-配置演化">3.1 Claude 配置演化</a></li>
+<li class="toc-l2"><a href="#32-shell-代理配置演化">3.2 Shell 代理配置演化</a></li>
+<li class="toc-l2"><a href="#33-链路变化图">3.3 链路变化图</a></li>
+<li class="toc-l3"><a href="#故障链路不稳定">故障链路（不稳定）</a></li>
+<li class="toc-l3"><a href="#修复后链路稳定">修复后链路（稳定）</a></li>
+<li class="toc-l2"><a href="#4-本次具体修改清单">4. 本次具体修改清单</a></li>
+<li class="toc-l2"><a href="#5-为什么你可以用-v2rayn-使用-claude">5. 为什么你可以用 v2rayN 使用 Claude</a></li>
+<li class="toc-l2"><a href="#6-为什么之前看起来一直能用">6. 为什么之前“看起来一直能用”</a></li>
+<li class="toc-l2"><a href="#7-当前修改的长期影响">7. 当前修改的长期影响</a></li>
+<li class="toc-l2"><a href="#8-推荐运行规范以后避免复发">8. 推荐运行规范（以后避免复发）</a></li>
+<li class="toc-l2"><a href="#9-快速自检命令">9. 快速自检命令</a></li></ol></div></details></aside>
+</main>
+<script>
+(function () {
+  document.querySelectorAll('pre > code').forEach(function (codeEl) {
+    var pre = codeEl.parentElement;
+    if (!pre || pre.parentElement.classList.contains('code-wrap')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'code-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.type = 'button';
+    btn.textContent = '复制';
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(codeEl.innerText).then(function () {
+        btn.textContent = '已复制';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          btn.textContent = '复制';
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>

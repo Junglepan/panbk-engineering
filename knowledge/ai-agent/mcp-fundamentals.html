@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MCP 全面理解：协议、架构与概念对比</title>
+  <style>
+:root {
+  color-scheme: light;
+  --bg: #f7f8fb;
+  --paper: #ffffff;
+  --text: #1f2937;
+  --text-strong: #111827;
+  --muted: #667085;
+  --line: #d9dee8;
+  --accent: #0f766e;
+  --accent-soft: #eef6f5;
+  --accent-deep: #134e4a;
+  --warn: #7c2d12;
+  --code-bg: #f1f5f9;
+  --code-block-bg: #0f172a;
+  --code-block-fg: #e5e7eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 16px;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.68;
+}
+
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 32px;
+  align-items: start;
+}
+
+main.no-toc {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1000px;
+}
+
+article {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 42px 48px;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.05);
+  min-width: 0;
+}
+
+/* Header block */
+.doc-header h1 {
+  margin: 0 0 12px;
+  font-size: 32px;
+  line-height: 1.25;
+  color: var(--text-strong);
+}
+
+.doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.doc-meta .date {
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-meta .sep {
+  color: var(--line);
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.status {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.status-complete { background: #dcfce7; color: #166534; }
+.status-wip      { background: #fef3c7; color: #92400e; }
+.status-draft    { background: #e5e7eb; color: #4b5563; }
+
+.doc-meta-extra {
+  background: var(--accent-soft);
+  border: 1px solid #d6e9e7;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 20px;
+  color: var(--accent-deep);
+  font-size: 14px;
+}
+.doc-meta-extra dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.doc-meta-extra dt {
+  font-weight: 500;
+}
+.doc-meta-extra dd {
+  margin: 0;
+}
+
+.lead {
+  font-size: 17px;
+  color: #243041;
+  border-left: 4px solid var(--accent);
+  padding: 4px 0 4px 14px;
+  margin: 16px 0 28px;
+}
+
+/* Headings inside body */
+.doc-body h2 {
+  margin: 38px 0 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 23px;
+  line-height: 1.3;
+  color: var(--text-strong);
+  scroll-margin-top: 16px;
+}
+.doc-body h3 {
+  margin: 26px 0 10px;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--accent-deep);
+  scroll-margin-top: 16px;
+}
+.doc-body h4 {
+  margin: 20px 0 8px;
+  font-size: 16px;
+  color: var(--text-strong);
+}
+
+.doc-body h2 .header-anchor,
+.doc-body h3 .header-anchor,
+.doc-body h4 .header-anchor {
+  margin-left: 8px;
+  color: var(--line);
+  text-decoration: none;
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.doc-body h2:hover .header-anchor,
+.doc-body h3:hover .header-anchor,
+.doc-body h4:hover .header-anchor {
+  opacity: 1;
+}
+
+/* Text content */
+.doc-body p { margin: 10px 0; }
+.doc-body ul, .doc-body ol { margin: 8px 0 16px 24px; padding: 0; }
+.doc-body li { margin: 4px 0; }
+.doc-body li > p { margin: 4px 0; }
+
+.doc-body blockquote {
+  border-left: 4px solid var(--line);
+  padding: 4px 0 4px 14px;
+  margin: 14px 0;
+  color: var(--muted);
+}
+
+.doc-body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 24px 0;
+}
+
+/* Inline code & code blocks */
+.doc-body code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.code-wrap {
+  position: relative;
+  margin: 14px 0;
+}
+.code-wrap pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--code-block-bg);
+  color: var(--code-block-fg);
+  line-height: 1.5;
+  font-size: 13.5px;
+}
+.code-wrap pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.code-wrap:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.copy-btn.copied { color: #86efac; }
+
+/* Tables */
+.doc-body table {
+  width: 100%;
+  margin: 14px 0 22px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.doc-body th, .doc-body td {
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  vertical-align: top;
+  text-align: left;
+}
+.doc-body th {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 500;
+}
+
+/* Admonitions (GitHub-style) */
+.admonition {
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 18px 0;
+  border: 1px solid;
+  background: #fff;
+}
+.admonition-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+.admonition-title::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.admonition > p:last-child { margin-bottom: 0; }
+.admonition > p:first-of-type { margin-top: 0; }
+
+.admonition.note      { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.admonition.tip       { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.admonition.important { background: #f5f3ff; border-color: #ddd6fe; color: #5b21b6; }
+.admonition.warning   { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.admonition.caution   { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+.admonition > p { color: var(--text); }
+
+/* Images */
+.doc-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+/* Links */
+.doc-body a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+.doc-body a:hover {
+  border-bottom-color: var(--accent);
+}
+
+/* TOC sidebar */
+aside.toc {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 16px 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+aside.toc .toc-title {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+aside.toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+aside.toc li { margin: 4px 0; }
+aside.toc a {
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border-left: 2px solid transparent;
+  line-height: 1.45;
+}
+aside.toc a:hover {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+aside.toc .toc-l3 a {
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Footer */
+.doc-footer {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.doc-footer code {
+  background: var(--code-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Narrow screens */
+@media (max-width: 980px) {
+  main {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px 12px 40px;
+  }
+  article {
+    padding: 24px 18px;
+  }
+  .doc-header h1 { font-size: 26px; }
+  .doc-body h2 { font-size: 20px; }
+  .doc-body table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  aside.toc {
+    position: static;
+    max-height: none;
+    order: -1;
+  }
+  aside.toc.collapsible {
+    padding: 0;
+  }
+  aside.toc.collapsible summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    list-style: none;
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  aside.toc.collapsible .toc-body {
+    padding: 0 16px 14px;
+  }
+  aside.toc.collapsible .toc-title { display: none; }
+}
+
+  </style>
+</head>
+<body>
+<main class="">
+<article>
+  <header class="doc-header">
+    <h1>MCP 全面理解：协议、架构与概念对比</h1>
+    <div class="doc-meta"><span class="date">2026-04-16</span>
+        <span class="tag-chip">mcp</span>
+        <span class="tag-chip">agent</span>
+        <span class="tag-chip">协议</span>
+        <span class="status status-complete">complete</span></div>
+
+
+  </header>
+  <div class="doc-body">
+<h2 id="一mcp-是什么为什么需要它">一、MCP 是什么，为什么需要它<a class="header-anchor" href="#一mcp-是什么为什么需要它">#</a></h2>
+<p><strong>MCP（Model Context Protocol）</strong> 是 Anthropic 提出的开放标准协议，解决一个核心问题：</p>
+<blockquote>
+<p>AI 模型如何安全、标准化地调用外部世界的能力？</p>
+</blockquote>
+<h3 id="没有-mcp-之前的困境">没有 MCP 之前的困境<a class="header-anchor" href="#没有-mcp-之前的困境">#</a></h3>
+<p>每个 AI 应用都要自己实现工具集成：</p>
+<ul>
+<li>GitHub 插件 = 自定义代码</li>
+<li>数据库查询 = 自定义代码</li>
+<li>文件操作 = 自定义代码</li>
+</ul>
+<p>工具与模型之间没有统一接口，<strong>换一个模型或换一个工具，一切重写</strong>。</p>
+<h3 id="mcp-的解法">MCP 的解法<a class="header-anchor" href="#mcp-的解法">#</a></h3>
+<p>定义一套标准协议，让任意 MCP Server 可以接入任意支持 MCP 的 AI Client：</p>
+<pre><code>AI Client（Claude / Cursor / Gemini）
+        ↕ MCP 协议（标准化）
+MCP Server（GitHub / 数据库 / 小红书 / 任意工具）
+</code></pre>
+<p>类比：就像 USB 协议让任意设备可以接入任意电脑，MCP 让任意工具可以接入任意 AI。</p>
+<hr />
+<h2 id="二mcp-核心架构三个角色">二、MCP 核心架构：三个角色<a class="header-anchor" href="#二mcp-核心架构三个角色">#</a></h2>
+<pre><code>┌──────────────────────────────────────┐
+│           Host Application           │  ← 用户交互入口（Claude Desktop、Claude Code）
+│  ┌────────────────────────────────┐  │
+│  │         MCP Client             │  │  ← 协议实现层，管理与 Server 的连接
+│  └──────────┬─────────────────────┘  │
+└─────────────┼────────────────────────┘
+              │ MCP Protocol
+    ┌─────────┴──────────┐
+    ▼                    ▼
+MCP Server A        MCP Server B        ← 工具提供者（可以有多个）
+（文件系统）         （小红书）
+</code></pre>
+<h3 id="host">Host<a class="header-anchor" href="#host">#</a></h3>
+<ul>
+<li>运行 AI 模型的宿主程序（如 Claude Desktop、Claude Code CLI）</li>
+<li>负责展示界面、管理用户会话</li>
+<li>可以同时连接多个 MCP Server</li>
+</ul>
+<h3 id="mcp-client">MCP Client<a class="header-anchor" href="#mcp-client">#</a></h3>
+<ul>
+<li>Host 内部的协议客户端</li>
+<li>负责与 MCP Server 握手、发现工具、发送调用请求</li>
+<li>一个 Client 对应一个 Server 连接</li>
+</ul>
+<h3 id="mcp-server">MCP Server<a class="header-anchor" href="#mcp-server">#</a></h3>
+<ul>
+<li>独立运行的服务进程</li>
+<li>暴露能力给 AI（Tools / Resources / Prompts）</li>
+<li>可以是本地进程，也可以是远程 HTTP 服务</li>
+</ul>
+<hr />
+<h2 id="三mcp-的三种原语primitives">三、MCP 的三种原语（Primitives）<a class="header-anchor" href="#三mcp-的三种原语primitives">#</a></h2>
+<p>MCP Server 可以暴露三类能力，职责各不相同：</p>
+<h3 id="1-tools工具-执行动作">1. Tools（工具）—— 执行动作<a class="header-anchor" href="#1-tools工具-执行动作">#</a></h3>
+<blockquote>
+<p>让 AI <strong>做事情</strong>，有副作用，会改变外部状态。</p>
+</blockquote>
+<pre><code>特征：
+- 有明确输入参数（JSON Schema 定义）
+- 执行后有返回结果
+- 可能有副作用（写文件、发请求、发帖子）
+- AI 根据用户意图自主决定是否调用
+
+例子：
+- search_feeds(keywords)   → 搜索小红书笔记
+- publish_content(...)     → 发布笔记
+- bash(command)            → 执行 shell 命令
+- create_file(path, content) → 创建文件
+</code></pre>
+<h3 id="2-resources资源-读取数据">2. Resources（资源）—— 读取数据<a class="header-anchor" href="#2-resources资源-读取数据">#</a></h3>
+<blockquote>
+<p>让 AI <strong>获取上下文</strong>，只读，不改变状态。</p>
+</blockquote>
+<pre><code>特征：
+- 类似&quot;文件&quot;或&quot;数据库记录&quot;，有唯一 URI
+- AI 可以订阅变更（动态资源）
+- 不执行操作，只提供数据
+
+例子：
+- file:///project/README.md  → 项目说明文档
+- db://users/1234            → 数据库中某条记录
+- config://app/settings      → 应用配置
+</code></pre>
+<h3 id="3-prompts提示模板-引导交互">3. Prompts（提示模板）—— 引导交互<a class="header-anchor" href="#3-prompts提示模板-引导交互">#</a></h3>
+<blockquote>
+<p>预定义的<strong>交互模式</strong>，帮助用户快速触发特定工作流。</p>
+</blockquote>
+<pre><code>特征：
+- 可带参数，生成定制化 prompt
+- 由用户主动触发（不是 AI 自主调用）
+- 类似&quot;快捷指令&quot;
+
+例子：
+- /summarize-pr → 生成 PR 总结的 prompt 模板
+- /debug-error  → 填入错误信息，生成调试 prompt
+</code></pre>
+<h3 id="三者对比">三者对比<a class="header-anchor" href="#三者对比">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Tools</th>
+<th>Resources</th>
+<th>Prompts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>谁触发</td>
+<td>AI 自主决定</td>
+<td>AI 自主读取</td>
+<td>用户主动触发</td>
+</tr>
+<tr>
+<td>有无副作用</td>
+<td>有</td>
+<td>无（只读）</td>
+<td>无</td>
+</tr>
+<tr>
+<td>类比</td>
+<td>函数调用</td>
+<td>文件读取</td>
+<td>快捷指令模板</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="四mcp-传输层两种通信方式">四、MCP 传输层：两种通信方式<a class="header-anchor" href="#四mcp-传输层两种通信方式">#</a></h2>
+<h3 id="stdio标准输入输出">stdio（标准输入输出）<a class="header-anchor" href="#stdio标准输入输出">#</a></h3>
+<pre><code>Host 进程 ──stdin/stdout──▶ MCP Server 进程（本地）
+
+特点：
+- 适合本地工具（文件系统、shell 命令）
+- Server 由 Host 启动，随 Host 关闭
+- 简单，无需网络，延迟最低
+</code></pre>
+<h3 id="httpstreamable-http-sse">HTTP（Streamable HTTP / SSE）<a class="header-anchor" href="#httpstreamable-http-sse">#</a></h3>
+<pre><code>Host ──HTTP POST /mcp──▶ MCP Server（本地或远程）
+
+特点：
+- 适合远程服务或需要持久运行的服务
+- 支持流式响应（SSE）
+- xiaohongshu-mcp 用的就是这种（端口 18060）
+</code></pre>
+<hr />
+<h2 id="五工具调用的完整生命周期">五、工具调用的完整生命周期<a class="header-anchor" href="#五工具调用的完整生命周期">#</a></h2>
+<pre><code>1. 连接阶段（握手）
+   Client → Server: initialize()
+   Server → Client: 返回 capabilities（支持哪些原语）
+
+2. 发现阶段
+   Client → Server: tools/list()
+   Server → Client: 返回所有 Tool 的名称 + 参数 Schema
+
+3. 推理阶段（在 LLM 内部）
+   Host 把 Tool 列表注入 system prompt
+   用户输入 → LLM 判断：需要调用哪个 Tool，参数是什么
+
+4. 执行阶段
+   Client → Server: tools/call(&quot;search_feeds&quot;, {keywords: &quot;护肤&quot;})
+   Server 执行实际逻辑（浏览器、API、数据库……）
+   Server → Client: 返回结构化结果
+
+5. 继续推理
+   LLM 拿到结果，继续生成回复或决定下一步调用
+</code></pre>
+<hr />
+<h2 id="六核心对比mcp-tool-vs-内置-tool-vs-skill">六、核心对比：MCP Tool vs 内置 Tool vs Skill<a class="header-anchor" href="#六核心对比mcp-tool-vs-内置-tool-vs-skill">#</a></h2>
+<p>这是理解 Claude 生态最容易混淆的三个概念。</p>
+<h3 id="内置-toolclaude-code-原生工具">内置 Tool（Claude Code 原生工具）<a class="header-anchor" href="#内置-toolclaude-code-原生工具">#</a></h3>
+<blockquote>
+<p>Claude Code 硬编码内置的能力，<strong>不走 MCP 协议</strong>。</p>
+</blockquote>
+<pre><code>特征：
+- 由 Anthropic 直接集成在 Claude Code 里
+- 无需配置，开箱即用
+- 执行在 Claude Code 进程内部
+
+例子：
+Read, Write, Edit, Bash, Grep, Glob,
+WebSearch, WebFetch, Agent, ...
+</code></pre>
+<h3 id="mcp-tool外部扩展工具">MCP Tool（外部扩展工具）<a class="header-anchor" href="#mcp-tool外部扩展工具">#</a></h3>
+<blockquote>
+<p>通过 MCP 协议连接的<strong>外部服务</strong>暴露的工具。</p>
+</blockquote>
+<pre><code>特征：
+- 运行在独立进程（本地或远程）
+- 需要在配置文件中声明才能使用
+- 可以由任何人开发和发布
+
+例子：
+xiaohongshu-mcp 的 search_feeds
+GitHub MCP 的 create_issue
+Postgres MCP 的 query_db
+
+配置方式（~/.claude/settings.json）：
+{
+  &quot;mcpServers&quot;: {
+    &quot;xiaohongshu&quot;: {
+      &quot;command&quot;: &quot;xiaohongshu-mcp&quot;,
+      &quot;args&quot;: []
+    }
+  }
+}
+</code></pre>
+<h3 id="skill技能斜线命令">Skill（技能/斜线命令）<a class="header-anchor" href="#skill技能斜线命令">#</a></h3>
+<blockquote>
+<p>预定义的<strong>工作流指令</strong>，本质是结构化的 prompt 或 instruction 文件。</p>
+</blockquote>
+<pre><code>特征：
+- 不是可执行程序，是 markdown 格式的指令文档
+- 用 /skill-name 触发，或通过 Skill tool 调用
+- 引导 Claude 以特定方式完成特定任务
+- 存放在 ~/.claude/skills/ 或项目 .claude/skills/
+
+例子：
+/review   → 按固定格式做代码审查
+/security-review → 执行安全检查流程
+/simplify → 对代码做简化重构
+
+本质：高质量的 system prompt 片段，而不是工具
+</code></pre>
+<h3 id="三者核心区别总结">三者核心区别总结<a class="header-anchor" href="#三者核心区别总结">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>内置 Tool</th>
+<th>MCP Tool</th>
+<th>Skill</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>本质</td>
+<td>原生能力</td>
+<td>外部服务接口</td>
+<td>工作流指令</td>
+</tr>
+<tr>
+<td>执行者</td>
+<td>Claude Code 进程</td>
+<td>独立 MCP Server 进程</td>
+<td>Claude 模型本身</td>
+</tr>
+<tr>
+<td>有副作用吗</td>
+<td>有（Bash/Write）</td>
+<td>有</td>
+<td>无（只引导行为）</td>
+</tr>
+<tr>
+<td>需要配置吗</td>
+<td>不需要</td>
+<td>需要注册 Server</td>
+<td>需要放置文件</td>
+</tr>
+<tr>
+<td>谁来开发</td>
+<td>Anthropic</td>
+<td>任何人</td>
+<td>任何人</td>
+</tr>
+<tr>
+<td>类比</td>
+<td>操作系统内置命令</td>
+<td>第三方 CLI 工具</td>
+<td>Shell 脚本别名</td>
+</tr>
+</tbody>
+</table>
+<h3 id="三者的依赖深度">三者的依赖深度<a class="header-anchor" href="#三者的依赖深度">#</a></h3>
+<p><strong>内置 Tool</strong> —— 依赖 Claude Code 安装本身，无需额外配置，权限可在 <code>settings.json</code> 中 allow/deny。</p>
+<p><strong>MCP Tool</strong> —— 依赖链最长，任意一环断掉工具即不可用：</p>
+<pre><code>1. MCP Server 进程必须在运行
+   ↓
+2. settings.json 里已注册该 Server
+   ↓
+3. Server 自身运行环境就绪
+   （Go 二进制 / Python venv / Node.js / Docker）
+   ↓
+4. Server 依赖的外部资源可用
+   （Cookie、API Key、数据库连接、网络……）
+</code></pre>
+<p><strong>Skill</strong> —— 依赖一个 <code>.md</code> 文件存在于正确路径：</p>
+<pre><code>~/.claude/skills/review.md      ← 全局
+.claude/skills/security.md     ← 项目级
+</code></pre>
+<p>无进程、无网络、无凭证，触发后全靠 Claude 模型自身推理执行。<br />
+代价是<strong>只能引导行为，不能直接操作外部系统</strong>（除非 Skill 指令里调用了其他 Tool）。</p>
+<p><strong>一句话总结依赖深度：</strong></p>
+<pre><code>内置 Tool  →  依赖 Claude Code 安装
+MCP Tool   →  依赖运行中的外部进程 + 环境 + 凭证
+Skill      →  依赖一个 markdown 文件
+</code></pre>
+<hr />
+<h2 id="七一个完整场景串联三者">七、一个完整场景串联三者<a class="header-anchor" href="#七一个完整场景串联三者">#</a></h2>
+<p><strong>场景</strong>：用户说&quot;帮我搜索小红书的护肤帖子，总结后写入文档&quot;</p>
+<pre><code>1. Claude 调用 MCP Tool（外部扩展）
+   → search_feeds(keywords=&quot;护肤&quot;)
+   → xiaohongshu-mcp Server 启动 Headless Chrome 执行搜索
+   → 返回帖子列表
+
+2. Claude 调用内置 Tool（原生能力）
+   → Write(&quot;/tmp/summary.md&quot;, 总结内容)
+   → 直接在本地写入文件
+
+3. 如果用 /review Skill 审查输出
+   → Skill 加载 review.md 的指令
+   → Claude 模型按指令格式做内容审查
+   → 没有任何工具调用，纯语言模型推理
+</code></pre>
+<hr />
+<h2 id="八注册到-claude-code-vs-独立启动的区别">八、注册到 Claude Code vs 独立启动的区别<a class="header-anchor" href="#八注册到-claude-code-vs-独立启动的区别">#</a></h2>
+<p>MCP Server 有两种使用方式，区别在于<strong>谁管理进程生命周期，以及 Claude 是否感知它的存在</strong>。</p>
+<h3 id="独立启动不注册">独立启动（不注册）<a class="header-anchor" href="#独立启动不注册">#</a></h3>
+<pre><code>你手动启动 Server 进程
+Claude Code 不知道它存在
+只能通过 REST /api/v1/* 直接调用（自己写脚本）
+Claude 无法用自然语言触发它的工具
+</code></pre>
+<p>适合：把 MCP Server 当普通 HTTP API 用，自己写自动化脚本调用。</p>
+<h3 id="注册到-claude-code-mcp-配置">注册到 Claude Code MCP 配置<a class="header-anchor" href="#注册到-claude-code-mcp-配置">#</a></h3>
+<pre><code class="language-json">// ~/.claude/settings.json
+{
+  &quot;mcpServers&quot;: {
+    &quot;xiaohongshu&quot;: {
+      &quot;command&quot;: &quot;xiaohongshu-mcp&quot;,  // stdio 模式：Claude Code 负责启停进程
+      &quot;args&quot;: []
+      // 或 HTTP 模式：
+      // &quot;url&quot;: &quot;http://localhost:18060/mcp&quot;  进程仍需自己启动
+    }
+  }
+}
+</code></pre>
+<p>注册后的变化：</p>
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>未注册</th>
+<th>已注册</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Claude 感知 Tool 列表</td>
+<td>否</td>
+<td>是（对话开始时自动发现）</td>
+</tr>
+<tr>
+<td>自然语言触发工具</td>
+<td>否</td>
+<td>是</td>
+</tr>
+<tr>
+<td>进程生命周期管理</td>
+<td>手动</td>
+<td>Claude Code 托管（stdio 模式）</td>
+</tr>
+<tr>
+<td>权限管控</td>
+<td>无</td>
+<td>走 Claude Code allow/deny 体系</td>
+</tr>
+</tbody>
+</table>
+<h3 id="stdio-vs-http-注册方式的差异">stdio vs HTTP 注册方式的差异<a class="header-anchor" href="#stdio-vs-http-注册方式的差异">#</a></h3>
+<ul>
+<li><strong>stdio</strong>：<code>&quot;command&quot;</code> 字段，Claude Code 负责启动/关闭 Server 进程，进程随会话生灭</li>
+<li><strong>HTTP</strong>：<code>&quot;url&quot;</code> 字段，Server 进程独立常驻，Claude Code 只负责发请求，不管进程</li>
+</ul>
+<p><strong>一句话总结：</strong></p>
+<blockquote>
+<p>不注册 = 你手动调 HTTP 接口；注册了 = Claude 能自主调用，工具成为它能力的一部分。</p>
+</blockquote>
+<hr />
+<h2 id="九mcp-生态现状">九、MCP 生态现状<a class="header-anchor" href="#九mcp-生态现状">#</a></h2>
+<pre><code>官方维护的 MCP Servers（Anthropic/Model-Context-Protocol）：
+- filesystem    本地文件操作
+- github        GitHub API
+- postgres      PostgreSQL 查询
+- brave-search  网页搜索
+- slack         Slack 消息
+- google-maps   地图查询
+
+社区维护：
+- xiaohongshu-mcp  小红书自动化
+- mcp-obsidian     Obsidian 笔记
+- mcp-linear       Linear 项目管理
+- ...（数千个）
+
+MCP Registry：
+- mcp.so / glama.ai / smithery.ai 等聚合平台
+</code></pre>
+<hr />
+<h2 id="九关键认知总结">九、关键认知总结<a class="header-anchor" href="#九关键认知总结">#</a></h2>
+<ol>
+<li><strong>MCP = AI 世界的 USB 协议</strong>，解决 AI ↔ 工具的标准化互联问题</li>
+<li><strong>三种原语职责分明</strong>：Tools 执行动作、Resources 提供数据、Prompts 引导交互</li>
+<li><strong>Tool ≠ Skill</strong>：Tool 是可执行的程序接口；Skill 是引导模型行为的指令文本</li>
+<li><strong>内置 Tool vs MCP Tool</strong>：前者内置在 Claude Code，后者是外部进程，通过协议通信</li>
+<li><strong>没有官方 API 也能做 MCP Server</strong>，但复杂度转移到数据获取层（爬虫/浏览器自动化）</li>
+<li><strong>MCP Server 本身开发简单</strong>，官方提供 Python/TypeScript/Go SDK，几十行代码即可起步</li>
+</ol>
+  </div>
+  <footer class="doc-footer">
+    <div>源文件：<code>knowledge/ai-agent/mcp-fundamentals.md</code></div>
+    <div>生成于：2026-05-20 03:06</div>
+  </footer>
+</article>
+<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#一mcp-是什么为什么需要它">一、MCP 是什么，为什么需要它</a></li>
+<li class="toc-l3"><a href="#没有-mcp-之前的困境">没有 MCP 之前的困境</a></li>
+<li class="toc-l3"><a href="#mcp-的解法">MCP 的解法</a></li>
+<li class="toc-l2"><a href="#二mcp-核心架构三个角色">二、MCP 核心架构：三个角色</a></li>
+<li class="toc-l3"><a href="#host">Host</a></li>
+<li class="toc-l3"><a href="#mcp-client">MCP Client</a></li>
+<li class="toc-l3"><a href="#mcp-server">MCP Server</a></li>
+<li class="toc-l2"><a href="#三mcp-的三种原语primitives">三、MCP 的三种原语（Primitives）</a></li>
+<li class="toc-l3"><a href="#1-tools工具-执行动作">1. Tools（工具）—— 执行动作</a></li>
+<li class="toc-l3"><a href="#2-resources资源-读取数据">2. Resources（资源）—— 读取数据</a></li>
+<li class="toc-l3"><a href="#3-prompts提示模板-引导交互">3. Prompts（提示模板）—— 引导交互</a></li>
+<li class="toc-l3"><a href="#三者对比">三者对比</a></li>
+<li class="toc-l2"><a href="#四mcp-传输层两种通信方式">四、MCP 传输层：两种通信方式</a></li>
+<li class="toc-l3"><a href="#stdio标准输入输出">stdio（标准输入输出）</a></li>
+<li class="toc-l3"><a href="#httpstreamable-http-sse">HTTP（Streamable HTTP / SSE）</a></li>
+<li class="toc-l2"><a href="#五工具调用的完整生命周期">五、工具调用的完整生命周期</a></li>
+<li class="toc-l2"><a href="#六核心对比mcp-tool-vs-内置-tool-vs-skill">六、核心对比：MCP Tool vs 内置 Tool vs Skill</a></li>
+<li class="toc-l3"><a href="#内置-toolclaude-code-原生工具">内置 Tool（Claude Code 原生工具）</a></li>
+<li class="toc-l3"><a href="#mcp-tool外部扩展工具">MCP Tool（外部扩展工具）</a></li>
+<li class="toc-l3"><a href="#skill技能斜线命令">Skill（技能/斜线命令）</a></li>
+<li class="toc-l3"><a href="#三者核心区别总结">三者核心区别总结</a></li>
+<li class="toc-l3"><a href="#三者的依赖深度">三者的依赖深度</a></li>
+<li class="toc-l2"><a href="#七一个完整场景串联三者">七、一个完整场景串联三者</a></li>
+<li class="toc-l2"><a href="#八注册到-claude-code-vs-独立启动的区别">八、注册到 Claude Code vs 独立启动的区别</a></li>
+<li class="toc-l3"><a href="#独立启动不注册">独立启动（不注册）</a></li>
+<li class="toc-l3"><a href="#注册到-claude-code-mcp-配置">注册到 Claude Code MCP 配置</a></li>
+<li class="toc-l3"><a href="#stdio-vs-http-注册方式的差异">stdio vs HTTP 注册方式的差异</a></li>
+<li class="toc-l2"><a href="#九mcp-生态现状">九、MCP 生态现状</a></li>
+<li class="toc-l2"><a href="#九关键认知总结">九、关键认知总结</a></li></ol></div></details></aside>
+</main>
+<script>
+(function () {
+  document.querySelectorAll('pre > code').forEach(function (codeEl) {
+    var pre = codeEl.parentElement;
+    if (!pre || pre.parentElement.classList.contains('code-wrap')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'code-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.type = 'button';
+    btn.textContent = '复制';
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(codeEl.innerText).then(function () {
+        btn.textContent = '已复制';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          btn.textContent = '复制';
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>
