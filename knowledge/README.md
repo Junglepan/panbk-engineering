@@ -7,7 +7,7 @@ status: complete
 
 # 知识总览
 
-个人技术知识库入口。按主题分类，持续更新。
+个人技术知识库入口。按主题分类，持续更新。md 是源；运行 `scripts/verify.sh` 后会构建一份 HTML 镜像到 `dist/`，作为更友好的阅读视图。
 
 ## 学习路径
 
@@ -80,4 +80,15 @@ status: complete
 
 ---
 
-> 新增笔记时，使用 [_template.md](_template.md) 作为模板，并在此页面更新对应分类表格。
+## 目录结构约定
+
+| 路径 | 角色 |
+|---|---|
+| `README.md` | 知识库入口（本文件），承担总览 + 学习路径 + 主题表格 |
+| `_meta/template.md` | 新文档骨架，供作者复制使用 |
+| `<topic>/<doc>.md` | 单文件主题，最常见形态 |
+| `<topic>/<doc>/README.md` + `<doc>/assets/` | 目录形态主题，当一篇笔记需要 ≥1 附件（图、附文）时升级 |
+| `incidents/` | 事故复盘；累计 ≥3 篇时按 `incidents/YYYY/MM-DD-slug.md` 重组 |
+| `dist/` | 由 `scripts/build-html.py` 生成的 HTML 镜像，不要手改 |
+
+新增笔记的步骤：复制 [_meta/template.md](_meta/template.md) → 改 frontmatter → 写正文 → 在本文件对应分类表格里加一行 → 运行 `scripts/verify.sh` 重建 HTML。

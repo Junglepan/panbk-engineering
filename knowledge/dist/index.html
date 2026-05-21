@@ -436,7 +436,7 @@ aside.toc .toc-l3 a {
         <span class="tag-chip">索引</span>
         <span class="status status-complete">complete</span></div>
 
-    <div class="lead">个人技术知识库入口。按主题分类，持续更新。</div>
+    <div class="lead">个人技术知识库入口。按主题分类，持续更新。md 是源；运行 <code>scripts/verify.sh</code> 后会构建一份 HTML 镜像到 <code>dist/</code>，作为更友好的阅读视图。</div>
   </header>
   <div class="doc-body">
 <h2 id="学习路径">学习路径<a class="header-anchor" href="#学习路径">#</a></h2>
@@ -455,7 +455,7 @@ aside.toc .toc-l3 a {
 </ol>
 <h3 id="想搞定网络代理问题">想搞定网络代理问题？<a class="header-anchor" href="#想搞定网络代理问题">#</a></h3>
 <ol>
-<li><a href="networking/proxy-basics/README.html">代理网络基础</a> — 从零理解代理、机场、节点</li>
+<li><a href="networking/proxy-basics/index.html">代理网络基础</a> — 从零理解代理、机场、节点</li>
 <li><a href="networking/v2ray-proxy-shell-switch.html">终端代理切换</a> — Shell 环境变量与代理的关系</li>
 <li><a href="incidents/v2rayn-oauth-2026-04-11.html">V2RayN OAuth 事件复盘</a> — 代理导致 OAuth 失败的真实案例</li>
 </ol>
@@ -540,7 +540,7 @@ aside.toc .toc-l3 a {
 </thead>
 <tbody>
 <tr>
-<td><a href="networking/proxy-basics/README.html">代理网络基础</a></td>
+<td><a href="networking/proxy-basics/index.html">代理网络基础</a></td>
 <td>2026-05-16</td>
 <td><code>代理</code> <code>网络</code></td>
 </tr>
@@ -616,13 +616,46 @@ aside.toc .toc-l3 a {
 </tbody>
 </table>
 <hr />
-<blockquote>
-<p>新增笔记时，使用 <a href="_template.html">_template.md</a> 作为模板，并在此页面更新对应分类表格。</p>
-</blockquote>
+<h2 id="目录结构约定">目录结构约定<a class="header-anchor" href="#目录结构约定">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th>角色</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>README.md</code></td>
+<td>知识库入口（本文件），承担总览 + 学习路径 + 主题表格</td>
+</tr>
+<tr>
+<td><code>_meta/template.md</code></td>
+<td>新文档骨架，供作者复制使用</td>
+</tr>
+<tr>
+<td><code>&lt;topic&gt;/&lt;doc&gt;.md</code></td>
+<td>单文件主题，最常见形态</td>
+</tr>
+<tr>
+<td><code>&lt;topic&gt;/&lt;doc&gt;/README.md</code> + <code>&lt;doc&gt;/assets/</code></td>
+<td>目录形态主题，当一篇笔记需要 ≥1 附件（图、附文）时升级</td>
+</tr>
+<tr>
+<td><code>incidents/</code></td>
+<td>事故复盘；累计 ≥3 篇时按 <code>incidents/YYYY/MM-DD-slug.md</code> 重组</td>
+</tr>
+<tr>
+<td><code>dist/</code></td>
+<td>由 <code>scripts/build-html.py</code> 生成的 HTML 镜像，不要手改</td>
+</tr>
+</tbody>
+</table>
+<p>新增笔记的步骤：复制 <a href="_meta/template.html">_meta/template.md</a> → 改 frontmatter → 写正文 → 在本文件对应分类表格里加一行 → 运行 <code>scripts/verify.sh</code> 重建 HTML。</p>
   </div>
   <footer class="doc-footer">
-    <div>源文件：<code>knowledge/_index.md</code></div>
-    <div>生成于：2026-05-20 03:06</div>
+    <div>源文件：<code>knowledge/README.md</code></div>
+    <div>生成于：2026-05-21 08:20</div>
   </footer>
 </article>
 <aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#学习路径">学习路径</a></li>
@@ -634,7 +667,8 @@ aside.toc .toc-l3 a {
 <li class="toc-l3"><a href="#codex">Codex</a></li>
 <li class="toc-l3"><a href="#网络与代理">网络与代理</a></li>
 <li class="toc-l3"><a href="#事故复盘">事故复盘</a></li>
-<li class="toc-l2"><a href="#标签索引">标签索引</a></li></ol></div></details></aside>
+<li class="toc-l2"><a href="#标签索引">标签索引</a></li>
+<li class="toc-l2"><a href="#目录结构约定">目录结构约定</a></li></ol></div></details></aside>
 </main>
 <script>
 (function () {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tw93 Claude 使用经验阅读总结</title>
+  <title>V2Ray 代理与终端下载切换总结</title>
   <style>
 :root {
   color-scheme: light;
@@ -431,127 +431,113 @@ aside.toc .toc-l3 a {
 <main class="">
 <article>
   <header class="doc-header">
-    <h1>Tw93 Claude 使用经验阅读总结</h1>
-    <div class="doc-meta"><span class="date">2026-03-12</span>
-        <span class="tag-chip">claude-code</span>
-        <span class="tag-chip">阅读笔记</span>
-        <span class="tag-chip">tw93</span>
+    <h1>V2Ray 代理与终端下载切换总结</h1>
+    <div class="doc-meta"><span class="date">2026-04-18</span>
+        <span class="tag-chip">v2ray</span>
+        <span class="tag-chip">代理</span>
+        <span class="tag-chip">终端</span>
         <span class="status status-complete">complete</span></div>
 
-    <div class="lead">原文链接：https://tw93.fun/2026-03-12/claude.html</div>
+
   </header>
   <div class="doc-body">
-<h2 id="一核心判断">一、核心判断<a class="header-anchor" href="#一核心判断">#</a></h2>
-<p>文章从实战角度指出：要把 Claude（或类似编码 Agent）用好，关键不在“提示词越长越好”，而在于把职责分层，并把关键规则从文字约定升级为工程约束。</p>
-<h2 id="二关键观点">二、关键观点<a class="header-anchor" href="#二关键观点">#</a></h2>
+<h2 id="1-背景与问题">1. 背景与问题<a class="header-anchor" href="#1-背景与问题">#</a></h2>
+<p>在终端执行 Bun 安装时出现报错：</p>
+<ul>
+<li><code>curl: (35) LibreSSL SSL_connect: SSL_ERROR_SYSCALL</code></li>
+<li>Bun 下载失败（GitHub release 资源）</li>
+</ul>
+<p>排查后确认，核心不是 Bun 本身，而是终端代理环境变量导致的网络路径问题。</p>
+<h2 id="2-根因">2. 根因<a class="header-anchor" href="#2-根因">#</a></h2>
+<p>当时 shell 全局导出了以下代理变量（大小写都有）：</p>
+<ul>
+<li><code>HTTP_PROXY</code> / <code>HTTPS_PROXY</code> / <code>ALL_PROXY</code></li>
+<li><code>http_proxy</code> / <code>https_proxy</code> / <code>all_proxy</code></li>
+</ul>
+<p>并且都指向本地端口 <code>127.0.0.1:10808</code>。</p>
+<p>这意味着：</p>
+<ul>
+<li><code>curl</code> 和依赖 <code>curl</code> 的安装脚本都会优先走该代理。</li>
+<li>一旦该端口不可用或当前链路不适配目标站点，就会出现 TLS/连接异常。</li>
+</ul>
+<h2 id="3-最终目标当前已实现">3. 最终目标（当前已实现）<a class="header-anchor" href="#3-最终目标当前已实现">#</a></h2>
+<p>你希望的行为是：</p>
+<ul>
+<li>新开终端默认走 <code>127.0.0.1:10808</code>（保持平时使用习惯）</li>
+<li>需要下载时手动切换到 <code>127.0.0.1:7890</code></li>
+</ul>
+<p>已在 <code>~/.zshrc</code> 中落地为函数化切换。</p>
+<h2 id="4-当前可用命令">4. 当前可用命令<a class="header-anchor" href="#4-当前可用命令">#</a></h2>
+<pre><code class="language-bash">proxy_on      # 切到 10808（默认）
+proxy_7890    # 临时切到 7890（下载时用）
+proxy_off     # 关闭代理
+proxy_status  # 查看当前代理变量
+</code></pre>
+<p>其中 <code>~/.zshrc</code> 启动时会自动执行 <code>proxy_on</code>，所以新终端默认是 <code>10808</code>。</p>
+<h2 id="5-推荐使用流程">5. 推荐使用流程<a class="header-anchor" href="#5-推荐使用流程">#</a></h2>
 <ol>
-<li>配置文件应短而硬</li>
+<li>平时正常使用（默认 <code>10808</code>）</li>
 </ol>
-<ul>
-<li><code>AGENTS.md/CLAUDE.md</code> 不应变成知识仓库。</li>
-<li>只放稳定硬约束：流程、边界、禁止项、验收口径。</li>
-</ul>
+<pre><code class="language-bash">proxy_status
+</code></pre>
 <ol start="2">
-<li>六层架构思维</li>
+<li>需要下载（例如 bun / npm / curl 某些资源）时：</li>
 </ol>
-<ul>
-<li>Context：常驻规则与任务上下文。</li>
-<li>Tools/MCP：可调用能力边界。</li>
-<li>Skills：可复用流程模块。</li>
-<li>Hooks：自动触发动作。</li>
-<li>Subagents：并行执行单元。</li>
-<li>Verifiers：完成真值判定。</li>
-</ul>
+<pre><code class="language-bash">proxy_7890
+# 执行下载命令
+proxy_on
+</code></pre>
 <ol start="3">
-<li>上下文污染是主要风险</li>
+<li>如果要彻底直连测试：</li>
 </ol>
-<ul>
-<li>工具返回、日志、冗长文档会挤压有效上下文。</li>
-<li>需控制输出长度、只保留决策关键信息。</li>
-</ul>
-<ol start="4">
-<li>Skills 要模块化与渐进加载</li>
-</ol>
-<ul>
-<li>技能主文件定义目标、边界、步骤。</li>
-<li>细节拆到 references/scripts，避免主上下文过重。</li>
-</ul>
-<ol start="5">
-<li>长任务必须有压缩与交接策略</li>
-</ol>
-<ul>
-<li>任务越长，越需要明确 compact/handoff 结构。</li>
-<li>压缩时必须保留：决策、改动、验证状态、待办风险。</li>
-</ul>
-<h2 id="三对日常开发的直接建议">三、对日常开发的直接建议<a class="header-anchor" href="#三对日常开发的直接建议">#</a></h2>
+<pre><code class="language-bash">proxy_off
+# 测试完成后恢复
+proxy_on
+</code></pre>
+<h2 id="6-针对单条命令临时指定代理不改全局">6. 针对单条命令临时指定代理（不改全局）<a class="header-anchor" href="#6-针对单条命令临时指定代理不改全局">#</a></h2>
+<p>如果不想切全局变量，可对单条命令指定：</p>
+<pre><code class="language-bash">curl -x http://127.0.0.1:7890 -fsSL https://bun.sh/install | bash
+</code></pre>
+<p>或：</p>
+<pre><code class="language-bash">HTTPS_PROXY=http://127.0.0.1:7890 HTTP_PROXY=http://127.0.0.1:7890 &lt;你的命令&gt;
+</code></pre>
+<h2 id="7-快速排查清单">7. 快速排查清单<a class="header-anchor" href="#7-快速排查清单">#</a></h2>
 <ol>
-<li>先 Plan，再 Execute</li>
+<li>查看当前代理变量：</li>
 </ol>
-<ul>
-<li>复杂任务先确认方案与边界，再进入改动，减少返工。</li>
-</ul>
+<pre><code class="language-bash">proxy_status
+</code></pre>
 <ol start="2">
-<li>规则代码化</li>
+<li>确认目标端口是否可用（10808/7890）：</li>
 </ol>
-<ul>
-<li>关键约束接入脚本/CI，不依赖“记得遵守”。</li>
-</ul>
+<pre><code class="language-bash">curl -I --proxy http://127.0.0.1:10808 https://github.com
+curl -I --proxy http://127.0.0.1:7890 https://github.com
+</code></pre>
 <ol start="3">
-<li>让“完成”有客观证据</li>
+<li>若下载失败，先做“变量-端口-命令”三段核对：</li>
 </ol>
 <ul>
-<li>每次交付附可复现验证结果，而非口头完成。</li>
+<li>变量是否切到期望端口</li>
+<li>端口对应代理程序是否在运行</li>
+<li>下载命令是否继承了当前 shell 环境</li>
 </ul>
-<ol start="4">
-<li>控制工具和插件复杂度</li>
-</ol>
-<ul>
-<li>只启用当前任务必要工具，降低噪声与误触发。</li>
-</ul>
-<h2 id="四可直接落地的项目结构">四、可直接落地的项目结构<a class="header-anchor" href="#四可直接落地的项目结构">#</a></h2>
-<ol>
-<li><code>AGENTS.md</code></li>
-</ol>
-<ul>
-<li>放流程和硬约束，不放冗长背景。</li>
-</ul>
-<ol start="2">
-<li><code>MEMORY.md</code></li>
-</ol>
-<ul>
-<li>放长期偏好与决策摘要，跨会话可复用。</li>
-</ul>
-<ol start="3">
-<li><code>HANDOFF.md</code></li>
-</ol>
-<ul>
-<li>固定模板记录当前状态，便于切会话接力。</li>
-</ul>
-<ol start="4">
-<li><code>.agents/skills/</code></li>
-</ol>
-<ul>
-<li>技能按需加载，保持主上下文精简。</li>
-</ul>
-<ol start="5">
-<li><code>scripts/verify.sh</code> + CI</li>
-</ol>
-<ul>
-<li>形成“完成前必须通过”的自动闸门。</li>
-</ul>
-<h2 id="五一句话总结">五、一句话总结<a class="header-anchor" href="#五一句话总结">#</a></h2>
-<p>这篇文章的重点是：把 Claude 从“提示词玩法”升级为“工程化 Agent 系统”，通过分层职责、上下文治理、技能化流程和可执行验证，实现稳定可复用的开发能力。</p>
+<h2 id="8-一句话结论">8. 一句话结论<a class="header-anchor" href="#8-一句话结论">#</a></h2>
+<p>这次问题本质是“终端代理环境变量与目标下载链路不匹配”，不是 Bun 安装器问题；
+通过 <code>proxy_on / proxy_7890 / proxy_off</code> 的函数化切换，已经实现了“默认 10808、下载时临时 7890”的稳定工作流。</p>
   </div>
   <footer class="doc-footer">
-    <div>源文件：<code>knowledge/ai-agent/tw93-claude.md</code></div>
-    <div>生成于：2026-05-20 03:06</div>
+    <div>源文件：<code>knowledge/networking/v2ray-proxy-shell-switch.md</code></div>
+    <div>生成于：2026-05-21 08:20</div>
   </footer>
 </article>
-<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#一核心判断">一、核心判断</a></li>
-<li class="toc-l2"><a href="#二关键观点">二、关键观点</a></li>
-<li class="toc-l2"><a href="#三对日常开发的直接建议">三、对日常开发的直接建议</a></li>
-<li class="toc-l2"><a href="#四可直接落地的项目结构">四、可直接落地的项目结构</a></li>
-<li class="toc-l2"><a href="#五一句话总结">五、一句话总结</a></li></ol></div></details></aside>
+<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#1-背景与问题">1. 背景与问题</a></li>
+<li class="toc-l2"><a href="#2-根因">2. 根因</a></li>
+<li class="toc-l2"><a href="#3-最终目标当前已实现">3. 最终目标（当前已实现）</a></li>
+<li class="toc-l2"><a href="#4-当前可用命令">4. 当前可用命令</a></li>
+<li class="toc-l2"><a href="#5-推荐使用流程">5. 推荐使用流程</a></li>
+<li class="toc-l2"><a href="#6-针对单条命令临时指定代理不改全局">6. 针对单条命令临时指定代理（不改全局）</a></li>
+<li class="toc-l2"><a href="#7-快速排查清单">7. 快速排查清单</a></li>
+<li class="toc-l2"><a href="#8-一句话结论">8. 一句话结论</a></li></ol></div></details></aside>
 </main>
 <script>
 (function () {

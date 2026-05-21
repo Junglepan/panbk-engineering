@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="920" viewBox="0 0 1200 920" role="img" aria-labelledby="title desc">
+  <title id="title">科学上网问题排查流程图</title>
+  <desc id="desc">从客户端运行、代理端口、订阅节点、DNS、Tun 模式和目标网站限制逐步排查。</desc>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #fbfaf7;
+      --ink: #222;
+      --muted: #68707d;
+      --line: #2f3542;
+      --start: #d8ecff;
+      --ok: #dff4df;
+      --warn: #fff0bf;
+      --bad: #ffe0dc;
+      --step: #eeeeee;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #151719;
+        --ink: #f2f2f2;
+        --muted: #b8bec8;
+        --line: #d8dee9;
+        --start: #173852;
+        --ok: #1f442b;
+        --warn: #594617;
+        --bad: #5a2927;
+        --step: #2a2f35;
+      }
+    }
+    svg { background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .title { fill: var(--ink); font-size: 34px; font-weight: 800; }
+    .subtitle { fill: var(--muted); font-size: 17px; }
+    .node { stroke: var(--line); stroke-width: 2.4; rx: 16; }
+    .start { fill: var(--start); }
+    .ok { fill: var(--ok); }
+    .warn { fill: var(--warn); }
+    .bad { fill: var(--bad); }
+    .step { fill: var(--step); }
+    .label { fill: var(--ink); font-size: 20px; font-weight: 760; text-anchor: middle; }
+    .small { fill: var(--muted); font-size: 14px; text-anchor: middle; }
+    .arrow { stroke: var(--line); stroke-width: 3; fill: none; marker-end: url(#arrow); }
+    .tag { fill: var(--muted); font-size: 14px; font-weight: 700; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="var(--line)" />
+    </marker>
+  </defs>
+
+  <text x="60" y="66" class="title">打不开网站时，按这个顺序排查</text>
+  <text x="60" y="102" class="subtitle">从“本地客户端是否工作”一路查到“目标网站是否限制节点 IP”，避免一上来乱改 DNS 或规则。</text>
+
+  <rect x="465" y="145" width="270" height="78" class="node start"/>
+  <text x="600" y="176" class="label">网站打不开 / 软件不通</text>
+  <text x="600" y="201" class="small">先确认现象：所有网站，还是只有某个网站？</text>
+
+  <rect x="465" y="280" width="270" height="86" class="node step"/>
+  <text x="600" y="312" class="label">1. 客户端是否运行？</text>
+  <text x="600" y="338" class="small">Clash / v2rayN 是否开启代理？</text>
+
+  <rect x="125" y="430" width="290" height="92" class="node bad"/>
+  <text x="270" y="462" class="label">没运行 / 没开启</text>
+  <text x="270" y="488" class="small">启动客户端，打开系统代理或 Tun</text>
+
+  <rect x="785" y="430" width="290" height="92" class="node step"/>
+  <text x="930" y="462" class="label">2. 本地端口是否可用？</text>
+  <text x="930" y="488" class="small">7890 / 10808 / SOCKS 端口</text>
+
+  <rect x="785" y="580" width="290" height="92" class="node warn"/>
+  <text x="930" y="612" class="label">3. 节点是否可用？</text>
+  <text x="930" y="638" class="small">换香港/日本/新加坡节点测试</text>
+
+  <rect x="465" y="580" width="270" height="92" class="node warn"/>
+  <text x="600" y="612" class="label">4. 是否 DNS / 规则问题？</text>
+  <text x="600" y="638" class="small">只某些站点失败时优先看这里</text>
+
+  <rect x="125" y="580" width="290" height="92" class="node warn"/>
+  <text x="270" y="612" class="label">5. 软件是否不听系统代理？</text>
+  <text x="270" y="638" class="small">终端、游戏、Docker 常见</text>
+
+  <rect x="125" y="735" width="290" height="92" class="node ok"/>
+  <text x="270" y="767" class="label">尝试 Tun / 环境变量</text>
+  <text x="270" y="793" class="small">终端可用 HTTP_PROXY / ALL_PROXY</text>
+
+  <rect x="465" y="735" width="270" height="92" class="node ok"/>
+  <text x="600" y="767" class="label">刷新订阅 / 切规则</text>
+  <text x="600" y="793" class="small">规则模式、全局模式对比测试</text>
+
+  <rect x="785" y="735" width="290" height="92" class="node ok"/>
+  <text x="930" y="767" class="label">换节点 / 换地区</text>
+  <text x="930" y="793" class="small">目标站可能屏蔽某些出口 IP</text>
+
+  <path d="M600 223 C600 247 600 256 600 280" class="arrow"/>
+  <path d="M465 323 C390 330 310 375 270 430" class="arrow"/>
+  <path d="M735 323 C810 330 890 375 930 430" class="arrow"/>
+  <path d="M930 522 C930 546 930 556 930 580" class="arrow"/>
+  <path d="M785 626 C760 626 760 626 735 626" class="arrow"/>
+  <path d="M465 626 C440 626 440 626 415 626" class="arrow"/>
+  <path d="M270 672 C270 696 270 711 270 735" class="arrow"/>
+  <path d="M600 672 C600 696 600 711 600 735" class="arrow"/>
+  <path d="M930 672 C930 696 930 711 930 735" class="arrow"/>
+
+  <text x="367" y="353" class="tag">否</text>
+  <text x="807" y="353" class="tag">是</text>
+  <text x="750" y="610" class="tag">端口通但网站不通</text>
+  <text x="425" y="610" class="tag">节点通但部分站不通</text>
+</svg>

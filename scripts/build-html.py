@@ -7,15 +7,18 @@
 #   "PyYAML>=6.0",
 # ]
 # ///
-"""Build HTML pages from knowledge/**/*.md.
+"""Build HTML pages from knowledge/**/*.md into knowledge/dist/.
 
-Protocol (see knowledge/_template.md):
+Protocol (see knowledge/_meta/template.md):
 - Frontmatter: title, date, tags, status (draft|wip|complete)
 - Body: standard markdown + GitHub admonitions (> [!NOTE] / [!TIP] / [!WARNING] / [!IMPORTANT] / [!CAUTION])
 - The first H1 is dropped (rendered from frontmatter)
 - The first blockquote right after H1, if it looks like "key：value" meta lines, is hoisted to a meta block
 - The first paragraph after that becomes the lead
-- Internal links: *.md → *.html ; trailing "/" → "/README.html"
+- Internal links: *.md → *.html ; */ → */index.html ; README.md → index.html
+- Output: knowledge/<rel>/<doc>.html → knowledge/dist/<rel>/<doc>.html ;
+          README.md (any level) → index.html ; assets (svg/png/...) mirrored.
+- Excluded: knowledge/_meta/ (templates), knowledge/dist/ (self).
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ import argparse
 import datetime as dt
 import html as html_lib
 import re
+import shutil
 import string
 import sys
 import unicodedata
@@ -36,7 +40,9 @@ from mdit_py_plugins.anchors import anchors_plugin
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 KNOWLEDGE_DIR = REPO_ROOT / "knowledge"
+DIST_DIR = KNOWLEDGE_DIR / "dist"
 TEMPLATE_DIR = Path(__file__).resolve().parent / "html-template"
+EXCLUDED_TOP = {"dist"}
 
 ADMONITION_KINDS = {"note", "tip", "warning", "important", "caution"}
 META_KEY_RE = re.compile(r"^[一-龥A-Za-z][一-龥A-Za-z0-9 _·]*[：:]\s*")
@@ -292,9 +298,14 @@ LINK_REWRITE_RE = re.compile(r"^([^#?]*?)(\.md)(#[^?]*)?$", re.IGNORECASE)
 def rewrite_href(href: str) -> str:
     if href.startswith(("http://", "https://", "mailto:", "#")):
         return href
-    # Trailing slash → README.html
+    # Trailing slash → index.html
     if href.endswith("/"):
-        return href + "README.html"
+        return href + "index.html"
+    # README.md → index.html (preserves "directory entry" convention)
+    if href.endswith("README.md") or href.lower().endswith("readme.md"):
+        return href[: -len("README.md")] + "index.html"
+    if "README.md#" in href:
+        return href.replace("README.md#", "index.html#", 1)
     m = LINK_REWRITE_RE.match(href)
     if m:
         return m.group(1) + ".html" + (m.group(3) or "")
@@ -458,9 +469,37 @@ def build_one(md_path: Path, template: string.Template, style_css: str) -> Path:
         BUILT_AT=built_at,
     )
 
-    out_path = md_path.with_suffix(".html")
+    out_path = output_path_for(md_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(out_html, encoding="utf-8")
     return out_path
+
+
+def output_path_for(md_path: Path) -> Path:
+    rel = md_path.relative_to(KNOWLEDGE_DIR)
+    if md_path.name == "README.md":
+        out_rel = rel.with_name("index.html")
+    else:
+        out_rel = rel.with_suffix(".html")
+    return DIST_DIR / out_rel
+
+
+def copy_assets() -> int:
+    """Mirror non-md/non-html files (assets) from knowledge/ into dist/."""
+    count = 0
+    for src in KNOWLEDGE_DIR.rglob("*"):
+        if src.is_dir():
+            continue
+        rel = src.relative_to(KNOWLEDGE_DIR)
+        if rel.parts and rel.parts[0] in EXCLUDED_TOP:
+            continue
+        if src.suffix.lower() in {".md", ".html"}:
+            continue
+        target = DIST_DIR / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, target)
+        count += 1
+    return count
 
 
 # --------------------------------------------------------------------------- #
@@ -470,7 +509,8 @@ def build_one(md_path: Path, template: string.Template, style_css: str) -> Path:
 def iter_md_files(root: Path) -> list[Path]:
     files = []
     for p in sorted(root.rglob("*.md")):
-        if p.name == "_template.md":
+        rel = p.relative_to(root)
+        if rel.parts and rel.parts[0] in EXCLUDED_TOP:
             continue
         files.append(p)
     return files
@@ -486,6 +526,7 @@ def main(argv: list[str]) -> int:
     style_css = (TEMPLATE_DIR / "style.css").read_text(encoding="utf-8")
     template = string.Template(template_text)
 
+    full_build = not args.paths
     if args.paths:
         targets = [Path(p).resolve() for p in args.paths]
     else:
@@ -495,6 +536,10 @@ def main(argv: list[str]) -> int:
         print("[build-html] no markdown files found", file=sys.stderr)
         return 1
 
+    if full_build and DIST_DIR.exists():
+        shutil.rmtree(DIST_DIR)
+    DIST_DIR.mkdir(parents=True, exist_ok=True)
+
     failures = 0
     for md_path in targets:
         try:
@@ -503,6 +548,10 @@ def main(argv: list[str]) -> int:
         except Exception as e:
             failures += 1
             print(f"[build-html] FAIL {md_path}: {e}", file=sys.stderr)
+
+    asset_count = copy_assets()
+    print(f"[build-html] mirrored {asset_count} asset file(s)")
+
     if failures:
         print(f"[build-html] {failures} file(s) failed", file=sys.stderr)
         return 2

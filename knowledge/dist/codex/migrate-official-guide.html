@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tw93 Agent 实践阅读总结</title>
+  <title>Codex 官方迁移思路总结</title>
   <style>
 :root {
   color-scheme: light;
@@ -431,117 +431,92 @@ aside.toc .toc-l3 a {
 <main class="">
 <article>
   <header class="doc-header">
-    <h1>Tw93 Agent 实践阅读总结</h1>
-    <div class="doc-meta"><span class="date">2026-03-21</span>
-        <span class="tag-chip">agent</span>
-        <span class="tag-chip">阅读笔记</span>
-        <span class="tag-chip">tw93</span>
+    <h1>Codex 官方迁移思路总结</h1>
+    <div class="doc-meta"><span class="date">2026-05-15</span>
+        <span class="tag-chip">codex</span>
+        <span class="tag-chip">迁移</span>
         <span class="status status-complete">complete</span></div>
 
-    <div class="lead">原文链接：https://tw93.fun/2026-03-21/agent.html</div>
+    <div class="lead">日期：2026-05-15<br />
+来源：<code>/Users/panbk/.codex/skills/migrate-to-codex</code></div>
   </header>
   <div class="doc-body">
-<h2 id="一核心判断">一、核心判断<a class="header-anchor" href="#一核心判断">#</a></h2>
-<p>文章强调：Agent 的“智能感”并不主要来自模型本身，而来自完整工程系统的设计。一个可复用的 Agent，需要把模型、工具、上下文、验证和回退机制组织成稳定闭环。</p>
-<h2 id="二关键观点">二、关键观点<a class="header-anchor" href="#二关键观点">#</a></h2>
+<h2 id="一句话">一句话<a class="header-anchor" href="#一句话">#</a></h2>
+<p><code>migrate-to-codex</code> 的核心不是“把 Claude 文件直接复制成 Codex 文件”，而是“先扫描，再转换，再标注风险，再验证目标，最后处理人工复核项”的迁移闭环。</p>
+<h2 id="核心原则">核心原则<a class="header-anchor" href="#核心原则">#</a></h2>
 <ol>
-<li>Agent 本体很小，系统工程很大</li>
+<li>先盘点再写入，不靠猜。</li>
+<li>能自动映射的就自动映射，不能等价的就明确标注。</li>
+<li>生成物和人工复核项要分开。</li>
+<li>迁移后必须验证目标是否真的可用。</li>
+<li>不要假装 1:1 等价，尤其是 hooks、权限、subagent、slash command、插件。</li>
 </ol>
-<ul>
-<li>语言模型 + 工具调用循环只是内核。</li>
-<li>真实效果取决于外层 harness：任务分解、状态跟踪、失败恢复、质量评估。</li>
-</ul>
-<ol start="2">
-<li>上下文管理决定成败</li>
-</ol>
-<ul>
-<li>不能把所有规则和技能一次性塞进上下文。</li>
-<li>应采用“常驻最小规则 + 按需加载技能 + 动态注入任务信息”的分层策略。</li>
-</ul>
-<ol start="3">
-<li>工具越多不一定越好</li>
-</ol>
-<ul>
-<li>工具定义和工具输出都会污染上下文。</li>
-<li>需要压缩工具返回、控制工具数量、把结果结构化，减少噪声。</li>
-</ul>
-<ol start="4">
-<li>验证机制是 Agent 的护栏</li>
-</ol>
-<ul>
-<li>仅靠“模型说完成了”不可靠。</li>
-<li>必须外接可执行验证（测试、lint、脚本、检查项），用证据驱动完成判定。</li>
-</ul>
-<ol start="5">
-<li>记忆需要独立设计</li>
-</ol>
-<ul>
-<li>会话内上下文不是长期记忆。</li>
-<li>长期偏好、项目决策、关键约束应外置到 memory 层，并可按需注入。</li>
-</ul>
-<h2 id="三对工程实践的启发">三、对工程实践的启发<a class="header-anchor" href="#三对工程实践的启发">#</a></h2>
+<h2 id="执行闭环">执行闭环<a class="header-anchor" href="#执行闭环">#</a></h2>
+<p>官方思路基本是：</p>
 <ol>
-<li>先搭框架再追模型</li>
+<li><code>--scan-only</code> 先看源目录里有什么。</li>
+<li><code>--plan</code> / <code>--doctor</code> 先看迁移计划和风险。</li>
+<li><code>--dry-run</code> 先模拟写入。</li>
+<li>真实写入 Codex 目标文件。</li>
+<li>读取迁移报告，修复 <code>manual_fix_required</code> 项。</li>
+<li><code>--validate-target</code> 检查目标格式和基本可用性。</li>
+<li>必要时再跑一轮。</li>
 </ol>
-<ul>
-<li>在现有模型能力下，先把流程闭环做扎实：计划、执行、验证、回滚。</li>
-</ul>
-<ol start="2">
-<li>把“规则文档”变成“可执行约束”</li>
-</ol>
-<ul>
-<li>能落到脚本和 CI 的规则，不只写在说明里。</li>
-<li>让 Agent 在真实工程环境中被自动约束。</li>
-</ul>
-<ol start="3">
-<li>设计可观测性</li>
-</ol>
-<ul>
-<li>对每一步保留最小必要日志：输入、动作、结果、失败原因。</li>
-<li>便于跨会话接力和问题追踪。</li>
-</ul>
-<h2 id="四可落地模板可直接用于项目">四、可落地模板（可直接用于项目）<a class="header-anchor" href="#四可落地模板可直接用于项目">#</a></h2>
+<p>这意味着迁移不是单次动作，而是一个“生成 -&gt; 复核 -&gt; 校验 -&gt; 再生成”的循环。</p>
+<h2 id="迁移顺序">迁移顺序<a class="header-anchor" href="#迁移顺序">#</a></h2>
+<p>官方转换顺序大致是：</p>
 <ol>
-<li>Soul（项目常驻）</li>
+<li>Instructions</li>
+<li>Plugins 报告</li>
+<li>Hooks</li>
+<li>Skills / Slash commands</li>
+<li>Config / MCP</li>
+<li>Subagents</li>
 </ol>
+<p>这个顺序有一个隐含前提：先处理最基础的行为说明，再处理能力面和运行时配置，最后处理角色定义。</p>
+<h2 id="最重要的差异边界">最重要的差异边界<a class="header-anchor" href="#最重要的差异边界">#</a></h2>
+<p>以下内容不是简单 copy 的对象，必须人工复核：</p>
 <ul>
-<li>文件：<code>AGENTS.md</code></li>
-<li>内容：流程顺序、硬约束、验收标准、禁止项。</li>
+<li>slash command 的 runtime 参数展开</li>
+<li>hooks 的生命周期和 matcher 语义</li>
+<li>permissionMode 到 sandbox 的映射</li>
+<li>subagent 的 model / effort / tools / skills 语义</li>
+<li>plugin tree 和 marketplace</li>
+<li>MCP header / env / transport 的细节</li>
 </ul>
-<ol start="2">
-<li>Memory（长期记忆）</li>
+<p>只要这些地方出现“看起来能写进去”，都不等于“语义已经等价”。</p>
+<h2 id="可以直接复用到同步规范里的做法">可以直接复用到同步规范里的做法<a class="header-anchor" href="#可以直接复用到同步规范里的做法">#</a></h2>
+<ol>
+<li>每次同步先生成计划，不直接写。</li>
+<li>每个迁移项都要有状态，至少区分 <code>added</code>、<code>check</code>、<code>not_added</code>。</li>
+<li>任何语义有损的地方都写入报告或目标文件里的 manual note。</li>
+<li>同步完成后必须做一次验证，而不是只看 UI 成功提示。</li>
+<li>用户看到的“可同步”不应等于“已经完全安全”。</li>
 </ol>
-<ul>
-<li>文件：<code>MEMORY.md</code> 或 <code>docs/memory.md</code></li>
-<li>内容：长期偏好、架构决策、历史坑点、常用命令。</li>
-</ul>
-<ol start="3">
-<li>Skills（按需能力）</li>
+<h2 id="对当前项目的启示">对当前项目的启示<a class="header-anchor" href="#对当前项目的启示">#</a></h2>
+<p>如果 <code>ClaudeCodex-Together</code> 要继续靠近官方 <code>migrate-to-codex</code>，优先级应该是：</p>
+<ol>
+<li>统一目标路径和文件格式。</li>
+<li>把 warning 从 UI 结果升级成可保存的 report。</li>
+<li>把 MCP / hooks / subagent 这些差异大的 surface 分层做出来。</li>
+<li>给同步结果增加验证层。</li>
 </ol>
-<ul>
-<li>路径：<code>.agents/skills/...</code></li>
-<li>策略：技能目录可见，正文按需加载。</li>
-</ul>
-<ol start="4">
-<li>Verifier（完成判定）</li>
-</ol>
-<ul>
-<li>路径：<code>scripts/verify.sh</code> + CI</li>
-<li>策略：完成前强制通过可执行检查。</li>
-</ul>
-<h2 id="五一句话总结">五、一句话总结<a class="header-anchor" href="#五一句话总结">#</a></h2>
-<p>这篇文章的核心是：把 Agent 当作“软件系统”而不是“会聊天的模型”，重点投入在上下文分层、工具治理、验证闭环和可观测性上，收益会比单纯更换模型更稳定。</p>
+<h2 id="最简结论">最简结论<a class="header-anchor" href="#最简结论">#</a></h2>
+<p>官方 <code>migrate-to-codex</code> 的价值在于把“迁移”拆成了可检查、可验证、可回滚思考的步骤，而不是把转换做成一个黑盒。</p>
   </div>
   <footer class="doc-footer">
-    <div>源文件：<code>knowledge/ai-agent/tw93-agent.md</code></div>
-    <div>生成于：2026-05-20 03:06</div>
+    <div>源文件：<code>knowledge/codex/migrate-official-guide.md</code></div>
+    <div>生成于：2026-05-21 08:20</div>
   </footer>
 </article>
-<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#一核心判断">一、核心判断</a></li>
-<li class="toc-l2"><a href="#二关键观点">二、关键观点</a></li>
-<li class="toc-l2"><a href="#三对工程实践的启发">三、对工程实践的启发</a></li>
-<li class="toc-l2"><a href="#四可落地模板可直接用于项目">四、可落地模板（可直接用于项目）</a></li>
-<li class="toc-l2"><a href="#五一句话总结">五、一句话总结</a></li></ol></div></details></aside>
+<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#一句话">一句话</a></li>
+<li class="toc-l2"><a href="#核心原则">核心原则</a></li>
+<li class="toc-l2"><a href="#执行闭环">执行闭环</a></li>
+<li class="toc-l2"><a href="#迁移顺序">迁移顺序</a></li>
+<li class="toc-l2"><a href="#最重要的差异边界">最重要的差异边界</a></li>
+<li class="toc-l2"><a href="#可以直接复用到同步规范里的做法">可以直接复用到同步规范里的做法</a></li>
+<li class="toc-l2"><a href="#对当前项目的启示">对当前项目的启示</a></li>
+<li class="toc-l2"><a href="#最简结论">最简结论</a></li></ol></div></details></aside>
 </main>
 <script>
 (function () {
