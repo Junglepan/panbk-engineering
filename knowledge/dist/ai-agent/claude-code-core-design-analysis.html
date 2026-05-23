@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude Code 核心设计工程剖析</title>
+  <style>
+:root {
+  --bg: #f7f8fb;
+  --panel: #ffffff;
+  --ink: #17202a;
+  --muted: #64748b;
+  --line: #d9e0ea;
+  --soft: #eef3f8;
+  --accent: #146c94;
+  --accent-2: #3b7a57;
+  --accent-3: #9a5b13;
+  --shadow: 0 18px 45px rgba(31, 41, 55, .08);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.65;
+  color: var(--ink);
+  background:
+    linear-gradient(180deg, rgba(20,108,148,.08), rgba(255,255,255,0) 340px),
+    var(--bg);
+}
+a { color: inherit; }
+.layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100vh;
+}
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 28px 22px;
+  border-right: 1px solid var(--line);
+  background: rgba(255,255,255,.86);
+  backdrop-filter: blur(16px);
+  overflow: auto;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+.mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.brand strong { display: block; line-height: 1.2; }
+.brand span { color: var(--muted); font-size: 13px; }
+.nav-title {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin: 22px 0 10px;
+}
+.toc {
+  display: grid;
+  gap: 4px;
+}
+.toc a {
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 14px;
+}
+.toc a:hover { background: var(--soft); color: var(--accent); }
+.main {
+  max-width: 1180px;
+  width: 100%;
+  padding: 42px 44px 80px;
+}
+.hero {
+  min-height: 430px;
+  display: grid;
+  align-content: center;
+  gap: 24px;
+  padding: 42px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 78% 18%, rgba(59,122,87,.16), transparent 30%),
+    linear-gradient(135deg, #ffffff, #edf6fb 58%, #f8fafc);
+  box-shadow: var(--shadow);
+}
+.eyebrow {
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+h1 {
+  max-width: 900px;
+  font-size: clamp(34px, 5vw, 62px);
+  line-height: 1.05;
+  margin: 0;
+  letter-spacing: 0;
+}
+.hero p {
+  max-width: 780px;
+  color: #475569;
+  font-size: 18px;
+  margin: 0;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chips span {
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.78);
+  border-radius: 999px;
+  padding: 7px 11px;
+  color: #334155;
+  font-size: 13px;
+}
+.section {
+  margin-top: 54px;
+  padding: 34px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 10px 30px rgba(31,41,55,.045);
+}
+.section-head p {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+h2 {
+  font-size: 30px;
+  margin: 0 0 24px;
+  line-height: 1.18;
+}
+h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+p { color: #475569; margin: 0 0 14px; }
+ul { margin: 0; padding-left: 20px; color: #475569; }
+li + li { margin-top: 6px; }
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: #edf2f7;
+  border: 1px solid #d8e1ec;
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.metric {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  background: #fbfdff;
+}
+.metric strong {
+  display: block;
+  font-size: 28px;
+  color: var(--accent);
+  line-height: 1.1;
+}
+.metric span { color: var(--muted); font-size: 13px; }
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  background: linear-gradient(180deg, #ffffff, #fbfcff);
+}
+.card-kicker {
+  display: inline-block;
+  color: var(--accent-2);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.flow {
+  display: grid;
+  gap: 12px;
+}
+.flow-step {
+  display: grid;
+  grid-template-columns: 48px minmax(130px, 190px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfdff;
+}
+.flow-step span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  font-size: 13px;
+  font-weight: 800;
+}
+.flow-step strong { color: #1f2937; }
+.flow-step p { margin: 0; }
+.diagram {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+.node {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  background: #f8fbfd;
+  min-height: 126px;
+}
+.node strong { display: block; margin-bottom: 8px; }
+.node p { font-size: 13px; margin: 0; }
+.arrow {
+  color: var(--accent);
+  font-weight: 800;
+  align-self: center;
+  text-align: center;
+}
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+th, td {
+  border-bottom: 1px solid var(--line);
+  padding: 13px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #f4f7fb;
+  color: #334155;
+  font-size: 13px;
+}
+td { color: #475569; }
+tr:last-child td { border-bottom: 0; }
+.callout {
+  border-left: 5px solid var(--accent-3);
+  background: #fff8ee;
+  padding: 18px 20px;
+  border-radius: 12px;
+}
+.callout strong { color: #7c3f00; }
+.two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.footer {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 38px;
+  padding: 20px 0;
+}
+@media (max-width: 980px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .main { padding: 28px 20px 60px; }
+  .hero { padding: 28px; min-height: auto; }
+  .metric-grid, .card-grid, .two-col, .diagram { grid-template-columns: 1fr; }
+  .flow-step { grid-template-columns: 42px 1fr; }
+  .flow-step p { grid-column: 2; }
+}
+</style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark">AI</div>
+        <div>
+          <strong>Claude Code 核心设计工程剖析</strong>
+          <span>知识理解页面</span>
+        </div>
+      </div>
+      <div class="nav-title">目录</div>
+      <nav class="toc">
+        <a href="#mental-model">整体心智模型</a><a href="#stack-map">技术栈与目录</a><a href="#runtime-flow">主运行链路</a><a href="#tool-system">工具系统</a><a href="#permission">权限与沙箱</a><a href="#context">上下文与记忆</a><a href="#extension">扩展与子代理</a><a href="#thinking-task-feature">Thinking / Task / Flags</a><a href="#quick-files">关键文件速查</a><a href="#tradeoffs">设计取舍</a><a href="#reading-path">源码阅读路径</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="hero">
+        <div class="eyebrow">Agent Runtime / Engineering Anatomy</div>
+        <h1>Claude Code 核心设计工程剖析</h1>
+        <p>从启动、模型循环、工具契约、权限沙箱、MCP、子代理、上下文压缩和会话持久化几个层面理解一个可执行 AI 编程助手如何被工程化。</p>
+        <div class="chips"><span>CLI 启动链路</span><span>Query Loop</span><span>Tool ABI</span><span>Permission Kernel</span><span>MCP &amp; Plugins</span><span>Session Replay</span></div>
+        <div class="metric-grid"><article class="metric">
+        <strong>8</strong>
+        <span>核心运行域</span>
+      </article><article class="metric">
+        <strong>1</strong>
+        <span>统一工具契约</span>
+      </article><article class="metric">
+        <strong>多层</strong>
+        <span>权限与沙箱防线</span>
+      </article><article class="metric">
+        <strong>JSONL</strong>
+        <span>会话事实源</span>
+      </article></div>
+      </header>
+      <section id="mental-model" class="section">
+    <div class="section-head">
+      <p>把它看成一个终端里的 Agent 操作系统</p>
+      <h2>整体心智模型</h2>
+    </div>
+    <div class="diagram">
+        <div class="node"><strong>用户与入口</strong><p>TUI、SDK、远程控制、后台任务都被归一成消息输入。</p></div>
+        <div class="arrow">→</div>
+        <div class="node"><strong>模型循环</strong><p><code>query()</code> 维护 assistant、tool_use、tool_result 的合法协议。</p></div>
+        <div class="arrow">→</div>
+        <div class="node"><strong>工具运行时</strong><p>工具执行层统一处理 schema、权限、hooks、进度和遥测。</p></div>
+      </div>
+      <div class="callout" style="margin-top:18px"><strong>关键理解：</strong>它的核心竞争力不是单个模型调用，而是围绕模型建立的可执行、可恢复、可观察工作系统。</div>
+  </section>
+      <section id="stack-map" class="section">
+    <div class="section-head">
+      <p>从文章目录补齐</p>
+      <h2>技术栈与目录结构</h2>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>层级</th><th>技术/机制</th><th>理解重点</th></tr></thead>
+      <tbody>
+        <tr><td>运行时</td><td>Node.js 18+、Bun bundle、feature gate</td><td>CLI 分发、构建期裁剪、启动快路径</td></tr>
+        <tr><td>终端 UI</td><td>React、Ink、自研 termio/layout</td><td>REPL、权限弹窗、任务面板、消息渲染</td></tr>
+        <tr><td>模型 API</td><td>Anthropic SDK beta messages、streaming</td><td>thinking、tool_use/tool_result、prompt cache、fallback</td></tr>
+        <tr><td>工具执行</td><td>Tool ABI、Shell、文件系统、MCP、LSP</td><td>统一处理行动边界、权限、并发和结果</td></tr>
+        <tr><td>状态持久化</td><td>AppState、JSONL transcript、memory dir</td><td>UI 状态、resume、长期偏好和会话事实源</td></tr>
+      </tbody>
+    </table></div>
+    <div class="card-grid" style="margin-top:16px">
+      <article class="card"><div class="card-kicker">Entry</div><h3>入口与启动</h3><p><code>entrypoints/</code>、<code>main.tsx</code> 负责启动分流、配置、鉴权、MCP、插件和 TUI 初始化。</p></article>
+      <article class="card"><div class="card-kicker">Loop</div><h3>模型循环</h3><p><code>query.ts</code>、<code>QueryEngine.ts</code> 负责多轮采样、工具结果回灌、错误恢复和 compact。</p></article>
+      <article class="card"><div class="card-kicker">Runtime</div><h3>执行内核</h3><p><code>Tool.ts</code>、<code>tools.ts</code>、<code>services/tools/</code> 形成工具 ABI 和工具执行层。</p></article>
+    </div>
+  </section>
+
+  <section id="thinking-task-feature" class="section">
+    <div class="section-head">
+      <p>内核补充</p>
+      <h2>Thinking、Task 与 Feature Flag</h2>
+    </div>
+    <div class="card-grid">
+      <article class="card"><div class="card-kicker">Thinking</div><h3>推理模式是协议能力</h3><p>Thinking 不是普通文本，而是模型请求和消息轨迹的一部分。streaming、fallback、compact、tool_result 配对都必须保护 thinking block 的合法性。</p></article>
+      <article class="card"><div class="card-kicker">Task</div><h3>长任务从主循环抽离</h3><p><code>LocalAgentTask</code>、<code>LocalShellTask</code>、<code>RemoteAgentTask</code> 把后台执行、进度、通知、停止和输出文件统一管理。</p></article>
+      <article class="card"><div class="card-kicker">Flags</div><h3>高级能力受 Gate 控制</h3><p><code>feature(...)</code>、环境变量和 GrowthBook gate 同时承担构建裁剪、实验发布、风险控制和性能优化。</p></article>
+    </div>
+    <div class="table-wrap" style="margin-top:16px"><table>
+      <thead><tr><th>Hook 阶段</th><th>触发时机</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td>UserPromptSubmit</td><td>用户输入进入模型前</td><td>阻断 prompt、追加上下文、写入附件</td></tr>
+        <tr><td>PreToolUse</td><td>工具权限判断和执行前</td><td>修改输入、阻断执行、提供权限结果</td></tr>
+        <tr><td>PermissionRequest</td><td>工具需要 ask 时</td><td>自动允许/拒绝、权限代理、持久化更新</td></tr>
+        <tr><td>PostToolUse / Failure</td><td>工具结束后</td><td>审计结果、改写 MCP 输出、追加诊断</td></tr>
+        <tr><td>PreCompact / PostCompact</td><td>对话压缩前后</td><td>保存上下文、恢复必要状态、清理</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="quick-files" class="section">
+    <div class="section-head">
+      <p>关键文件速查</p>
+      <h2>按问题定位源码</h2>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>想理解的问题</th><th>优先阅读文件</th></tr></thead>
+      <tbody>
+        <tr><td>CLI 怎么启动？</td><td><code>entrypoints/cli.tsx</code>、<code>main.tsx</code></td></tr>
+        <tr><td>Agent Loop 在哪里？</td><td><code>query.ts</code>、<code>QueryEngine.ts</code>、<code>query/config.ts</code></td></tr>
+        <tr><td>工具接口是什么？</td><td><code>Tool.ts</code>、<code>tools.ts</code></td></tr>
+        <tr><td>工具怎么执行？</td><td><code>services/tools/toolExecution.ts</code>、<code>StreamingToolExecutor.ts</code></td></tr>
+        <tr><td>权限和沙箱怎么看？</td><td><code>utils/permissions/permissions.ts</code>、<code>utils/sandbox/sandbox-adapter.ts</code></td></tr>
+        <tr><td>子代理怎么启动？</td><td><code>tools/AgentTool/AgentTool.tsx</code>、<code>tools/AgentTool/runAgent.ts</code></td></tr>
+        <tr><td>会话怎么保存恢复？</td><td><code>utils/sessionStorage.ts</code>、<code>utils/sessionRestore.ts</code></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+<section id="runtime-flow" class="section">
+    <div class="section-head">
+      <p>从输入到工具结果再回到模型</p>
+      <h2>主运行链路</h2>
+    </div>
+    <div class="flow"><div class="flow-step">
+        <span>01</span>
+        <strong>输入归一</strong>
+        <p>REPL、SDK、远程消息、命令队列和后台通知都会先进入输入处理层。</p>
+      </div><div class="flow-step">
+        <span>02</span>
+        <strong>上下文构造</strong>
+        <p>系统提示、用户上下文、MCP instructions、memory、工具池和权限上下文被合成一次请求前缀。</p>
+      </div><div class="flow-step">
+        <span>03</span>
+        <strong>模型采样</strong>
+        <p>API 层处理 betas、prompt cache、streaming、fallback、usage 和 quota。</p>
+      </div><div class="flow-step">
+        <span>04</span>
+        <strong>工具执行</strong>
+        <p>模型产生的 tool_use 经工具编排层验证、授权、执行，输出 tool_result。</p>
+      </div><div class="flow-step">
+        <span>05</span>
+        <strong>继续或停止</strong>
+        <p>tool_result 回灌给模型；直到自然停止、hook 阻断、压缩、错误恢复或达到回合限制。</p>
+      </div></div>
+  </section>
+<section id="tool-system" class="section">
+    <div class="section-head">
+      <p>Tool 是能力、权限、UI 和协议的共同边界</p>
+      <h2>工具系统</h2>
+    </div>
+    <div class="card-grid"><article class="card">
+        <div class="card-kicker">Schema</div>
+        <h3>输入输出契约</h3>
+        <p>每个工具都有输入 schema、输出映射和结果大小预算，避免模型随意构造不可执行参数。</p>
+      </article><article class="card">
+        <div class="card-kicker">Runtime</div>
+        <h3>并发与中断</h3>
+        <p>只读或 concurrency-safe 工具可并发，写操作和高风险工具保守串行；中断行为由工具声明。</p>
+      </article><article class="card">
+        <div class="card-kicker">Presentation</div>
+        <h3>终端展示</h3>
+        <p>工具不仅执行，还负责进度、结果、错误、分组展示，TUI 能给用户持续反馈。</p>
+      </article><article class="card">
+        <div class="card-kicker">Security</div>
+        <h3>权限参与者</h3>
+        <p>工具可以声明 read-only、destructive、open-world、classifier input，并参与权限决策。</p>
+      </article><article class="card">
+        <div class="card-kicker">MCP</div>
+        <h3>外部工具接入</h3>
+        <p>MCP 工具被包成同一种 Tool，继续走权限、hooks、结果预算和遥测链路。</p>
+      </article><article class="card">
+        <div class="card-kicker">Search</div>
+        <h3>工具可延迟加载</h3>
+        <p>ToolSearch 和 defer_loading 控制模型初始可见工具面，降低 token 和缓存抖动。</p>
+      </article></div>
+  </section>
+<section id="permission" class="section">
+    <div class="section-head">
+      <p>让模型行动，但不让行动失控</p>
+      <h2>权限与沙箱</h2>
+    </div>
+    <div class="two-col">
+        <div class="card"><h3>权限仲裁层</h3><ul><li>allow / deny / ask 规则</li><li>default、acceptEdits、dontAsk、plan、auto 等模式</li><li>工具自身 checkPermissions</li><li>PreToolUse 与 PermissionRequest hooks</li><li>auto mode 安全分类器</li><li>headless 无法询问时自动拒绝</li></ul></div>
+        <div class="card"><h3>OS 沙箱层</h3><ul><li>文件读写 allow/deny 列表</li><li>网络域名 allow/deny</li><li>settings 与 .claude/skills 写保护</li><li>bare git repo escape 防护</li><li>sandbox 不可用时显式告警</li><li>ripgrep 与子进程运行时适配</li></ul></div>
+      </div>
+  </section>
+<section id="context" class="section">
+    <div class="section-head">
+      <p>长任务可靠性的关键不是无限窗口，而是分层上下文管理</p>
+      <h2>上下文与记忆</h2>
+    </div>
+    <div class="table-wrap"><table>
+    <thead><tr><th>机制</th><th>保存什么</th><th>不适合保存什么</th><th>工程价值</th></tr></thead>
+    <tbody><tr><td>Transcript JSONL</td><td>会话消息、附件、compact boundary、metadata</td><td>UI-only 高频 progress</td><td>可恢复、可重放、可审计</td></tr><tr><td>Memory</td><td>长期偏好、协作背景、跨会话有用信息</td><td>源码可直接推导的项目事实</td><td>减少未来沟通成本</td></tr><tr><td>Compact</td><td>对话历史摘要和关键恢复附件</td><td>无选择地保留所有原始上下文</td><td>避免长任务撞上下文上限</td></tr><tr><td>Tool result storage</td><td>过大工具输出的落盘结果和预览</td><td>必须完整进模型的小结果</td><td>控制 token，同时保留可追溯输出</td></tr></tbody>
+  </table></div>
+  </section>
+<section id="extension" class="section">
+    <div class="section-head">
+      <p>所有扩展最终都回到工具、命令、hook、资源这几个运行时抽象</p>
+      <h2>扩展与子代理</h2>
+    </div>
+    <div class="card-grid"><article class="card">
+        <div class="card-kicker">MCP</div>
+        <h3>外部服务能力</h3>
+        <p>stdio、SSE、HTTP、WebSocket 等 transport 接入后，资源和工具进入统一工具池。</p>
+      </article><article class="card">
+        <div class="card-kicker">Plugins</div>
+        <h3>分发与管理单元</h3>
+        <p>插件负责 marketplace、版本化缓存、commands、agents、hooks 和策略限制。</p>
+      </article><article class="card">
+        <div class="card-kicker">Skills</div>
+        <h3>可复用操作规程</h3>
+        <p>技能通过 frontmatter 暴露描述、触发条件、允许工具、模型和 hooks，内容按需加载。</p>
+      </article><article class="card">
+        <div class="card-kicker">Agents</div>
+        <h3>独立上下文工作者</h3>
+        <p>子代理有自己的工具、权限、MCP、transcript 和可选 worktree 隔离。</p>
+      </article><article class="card">
+        <div class="card-kicker">Tasks</div>
+        <h3>长任务容器</h3>
+        <p>后台 agent、shell、remote task 都进入统一任务框架，支持进度、通知、停止和恢复。</p>
+      </article><article class="card">
+        <div class="card-kicker">Remote</div>
+        <h3>跨环境协作</h3>
+        <p>bridge、remote-control 和 session ingress 把本地能力暴露给远端会话，但仍需要权限回路。</p>
+      </article></div>
+  </section>
+<section id="tradeoffs" class="section">
+    <div class="section-head">
+      <p>复杂性来自真实可执行能力</p>
+      <h2>设计取舍</h2>
+    </div>
+    <div class="table-wrap"><table>
+    <thead><tr><th>设计选择</th><th>收益</th><th>代价</th></tr></thead>
+    <tbody><tr><td>强 Tool 接口</td><td>统一安全、UI、执行和协议处理</td><td>工具实现成本高，接口庞大</td></tr><tr><td>动态 feature gate</td><td>外部构建可裁剪，实验能力可控</td><td>路径多，测试和阅读难度上升</td></tr><tr><td>多层权限系统</td><td>适配个人、团队、企业和 headless 场景</td><td>规则来源多，理解成本高</td></tr><tr><td>JSONL 会话事实源</td><td>长任务 resume 和审计可行</td><td>历史兼容、日志大小和链路修复复杂</td></tr><tr><td>自动上下文压缩</td><td>支持超长会话</td><td>摘要丢失风险，需要恢复附件和失败熔断</td></tr></tbody>
+  </table></div>
+  </section>
+<section id="reading-path" class="section">
+    <div class="section-head">
+      <p>按运行链路读，而不是按目录顺序读</p>
+      <h2>源码阅读路径</h2>
+    </div>
+    <div class="flow"><div class="flow-step">
+        <span>01</span>
+        <strong>启动入口</strong>
+        <p><code>entrypoints/cli.tsx</code> 与 <code>main.tsx</code>，理解快路径和初始化。</p>
+      </div><div class="flow-step">
+        <span>02</span>
+        <strong>交互主体</strong>
+        <p><code>screens/REPL.tsx</code> 与 <code>QueryEngine.ts</code>，理解 TUI 和 headless 的分流。</p>
+      </div><div class="flow-step">
+        <span>03</span>
+        <strong>模型循环</strong>
+        <p><code>query.ts</code> 与 <code>services/api/claude.ts</code>，理解采样、fallback 和协议修复。</p>
+      </div><div class="flow-step">
+        <span>04</span>
+        <strong>执行内核</strong>
+        <p><code>Tool.ts</code>、<code>tools.ts</code>、<code>services/tools/*</code>，理解工具 ABI。</p>
+      </div><div class="flow-step">
+        <span>05</span>
+        <strong>安全与扩展</strong>
+        <p><code>utils/permissions/*</code>、<code>sandbox-adapter.ts</code>、<code>services/mcp/*</code>、<code>AgentTool/*</code>。</p>
+      </div></div>
+  </section>
+      <div class="footer">HTML 页面为独立信息架构设计，不依赖 Markdown-to-HTML 转换；Markdown 文件仍作为原始知识文档保留。</div>
+    </main>
+  </div>
+</body>
+</html>

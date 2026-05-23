@@ -13,9 +13,11 @@ status: complete
 
 ### 想理解 AI Agent 怎么工作？
 
-1. [Claude Code 执行机制全景分析](ai-agent/claude-execution-mechanics.md) — 从底层理解 Claude Code 的会话、工具、权限、记忆机制
-2. [MCP 全面理解](ai-agent/mcp-fundamentals.md) — Agent 与外部系统交互的协议标准
-3. [小红书 MCP 架构](ai-agent/xiaohongshu-mcp.md) — MCP 的真实落地案例
+1. [Claude Code 核心设计工程剖析](ai-agent/claude-code-core-design-analysis.md) — 从源码还原角度理解 Agent runtime、工具、权限、上下文和扩展机制
+2. [Agent 使用、学习与知识化技术总结](ai-agent/agent-learning-knowledge-technical-summary.md) — 把 Agent 使用经验沉淀为任务、流程、技能和知识体系
+3. [Claude Code 执行机制全景分析](ai-agent/claude-execution-mechanics.md) — 从底层理解 Claude Code 的会话、工具、权限、记忆机制
+4. [MCP 全面理解](ai-agent/mcp-fundamentals.md) — Agent 与外部系统交互的协议标准
+5. [小红书 MCP 架构](ai-agent/xiaohongshu-mcp.md) — MCP 的真实落地案例
 
 ### 想从 Claude Code 迁移到 Codex？
 
@@ -36,6 +38,8 @@ status: complete
 
 | 文档 | 日期 | 标签 |
 |------|------|------|
+| [Claude Code 核心设计工程剖析](ai-agent/claude-code-core-design-analysis.md) | 2026-05-21 | `claude-code` `agent` `架构` |
+| [Agent 使用、学习与知识化技术总结](ai-agent/agent-learning-knowledge-technical-summary.md) | 2026-05-21 | `agent` `大模型` `知识管理` |
 | [Claude Code 执行机制](ai-agent/claude-execution-mechanics.md) | 2026-04-18 | `claude-code` `架构` |
 | [MCP 全面理解](ai-agent/mcp-fundamentals.md) | 2026-04-16 | `mcp` `协议` |
 | [小红书 MCP 架构](ai-agent/xiaohongshu-mcp.md) | 2026-04-16 | `mcp` `架构` |
@@ -68,14 +72,16 @@ status: complete
 
 | 标签 | 相关文档数 |
 |------|-----------|
-| `claude-code` | 5 |
+| `claude-code` | 6 |
 | `mcp` | 2 |
-| `agent` | 3 |
+| `agent` | 5 |
 | `codex` | 4 |
 | `迁移` | 3 |
 | `v2ray` | 3 |
 | `代理` | 2 |
 | `阅读笔记` | 2 |
+| `大模型` | 1 |
+| `知识管理` | 1 |
 | `故障复盘` | 1 |
 
 ---
