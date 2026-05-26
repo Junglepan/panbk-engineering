@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent 使用、学习与知识化技术总结</title>
+  <style>
+:root {
+  --bg: #f7f8fb;
+  --panel: #ffffff;
+  --ink: #17202a;
+  --muted: #64748b;
+  --line: #d9e0ea;
+  --soft: #eef3f8;
+  --accent: #146c94;
+  --accent-2: #3b7a57;
+  --accent-3: #9a5b13;
+  --shadow: 0 18px 45px rgba(31, 41, 55, .08);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.65;
+  color: var(--ink);
+  background:
+    linear-gradient(180deg, rgba(20,108,148,.08), rgba(255,255,255,0) 340px),
+    var(--bg);
+}
+a { color: inherit; }
+.layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100vh;
+}
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 28px 22px;
+  border-right: 1px solid var(--line);
+  background: rgba(255,255,255,.86);
+  backdrop-filter: blur(16px);
+  overflow: auto;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+.mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.brand strong { display: block; line-height: 1.2; }
+.brand span { color: var(--muted); font-size: 13px; }
+.nav-title {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin: 22px 0 10px;
+}
+.toc {
+  display: grid;
+  gap: 4px;
+}
+.toc a {
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 14px;
+}
+.toc a:hover { background: var(--soft); color: var(--accent); }
+.main {
+  max-width: 1180px;
+  width: 100%;
+  padding: 42px 44px 80px;
+}
+.hero {
+  min-height: 430px;
+  display: grid;
+  align-content: center;
+  gap: 24px;
+  padding: 42px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 78% 18%, rgba(59,122,87,.16), transparent 30%),
+    linear-gradient(135deg, #ffffff, #edf6fb 58%, #f8fafc);
+  box-shadow: var(--shadow);
+}
+.eyebrow {
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+h1 {
+  max-width: 900px;
+  font-size: clamp(34px, 5vw, 62px);
+  line-height: 1.05;
+  margin: 0;
+  letter-spacing: 0;
+}
+.hero p {
+  max-width: 780px;
+  color: #475569;
+  font-size: 18px;
+  margin: 0;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chips span {
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.78);
+  border-radius: 999px;
+  padding: 7px 11px;
+  color: #334155;
+  font-size: 13px;
+}
+.section {
+  margin-top: 54px;
+  padding: 34px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 10px 30px rgba(31,41,55,.045);
+}
+.section-head p {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+h2 {
+  font-size: 30px;
+  margin: 0 0 24px;
+  line-height: 1.18;
+}
+h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+p { color: #475569; margin: 0 0 14px; }
+ul { margin: 0; padding-left: 20px; color: #475569; }
+li + li { margin-top: 6px; }
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: #edf2f7;
+  border: 1px solid #d8e1ec;
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.metric {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  background: #fbfdff;
+}
+.metric strong {
+  display: block;
+  font-size: 28px;
+  color: var(--accent);
+  line-height: 1.1;
+}
+.metric span { color: var(--muted); font-size: 13px; }
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  background: linear-gradient(180deg, #ffffff, #fbfcff);
+}
+.card-kicker {
+  display: inline-block;
+  color: var(--accent-2);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.flow {
+  display: grid;
+  gap: 12px;
+}
+.flow-step {
+  display: grid;
+  grid-template-columns: 48px minmax(130px, 190px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfdff;
+}
+.flow-step span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  font-size: 13px;
+  font-weight: 800;
+}
+.flow-step strong { color: #1f2937; }
+.flow-step p { margin: 0; }
+.diagram {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+.node {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  background: #f8fbfd;
+  min-height: 126px;
+}
+.node strong { display: block; margin-bottom: 8px; }
+.node p { font-size: 13px; margin: 0; }
+.arrow {
+  color: var(--accent);
+  font-weight: 800;
+  align-self: center;
+  text-align: center;
+}
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+th, td {
+  border-bottom: 1px solid var(--line);
+  padding: 13px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #f4f7fb;
+  color: #334155;
+  font-size: 13px;
+}
+td { color: #475569; }
+tr:last-child td { border-bottom: 0; }
+.callout {
+  border-left: 5px solid var(--accent-3);
+  background: #fff8ee;
+  padding: 18px 20px;
+  border-radius: 12px;
+}
+.callout strong { color: #7c3f00; }
+.two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.footer {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 38px;
+  padding: 20px 0;
+}
+@media (max-width: 980px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .main { padding: 28px 20px 60px; }
+  .hero { padding: 28px; min-height: auto; }
+  .metric-grid, .card-grid, .two-col, .diagram { grid-template-columns: 1fr; }
+  .flow-step { grid-template-columns: 42px 1fr; }
+  .flow-step p { grid-column: 2; }
+}
+</style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark">AI</div>
+        <div>
+          <strong>Agent 使用、学习与知识化技术总结</strong>
+          <span>知识理解页面</span>
+        </div>
+      </div>
+      <div class="nav-title">目录</div>
+      <nav class="toc">
+        <a href="#agent-shift">认知转变</a><a href="#task-design">任务设计</a><a href="#learning-layers">学习四层</a><a href="#knowledge-loop">知识沉淀</a><a href="#anti-patterns">常见反模式</a><a href="#team-adoption">团队落地</a><a href="#catalog-method">目录法学习</a><a href="#runtime-design">自研 Agent 技术栈</a><a href="#principles">长期原则</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="hero">
+        <div class="eyebrow">Agent Literacy / Knowledge System</div>
+        <h1>Agent 使用、学习与知识化技术总结</h1>
+        <p>把 Agent 当成可设计的工作系统来学习：从任务表达、上下文、权限、验证、知识沉淀到团队落地和自研 runtime。</p>
+        <div class="chips"><span>任务设计</span><span>上下文工程</span><span>验证闭环</span><span>技能沉淀</span><span>团队流程</span><span>Agent Runtime</span></div>
+        <div class="metric-grid"><article class="metric">
+        <strong>4层</strong>
+        <span>学习模型</span>
+      </article><article class="metric">
+        <strong>6类</strong>
+        <span>任务边界</span>
+      </article><article class="metric">
+        <strong>4库</strong>
+        <span>知识沉淀对象</span>
+      </article><article class="metric">
+        <strong>1套</strong>
+        <span>Agent 工作系统</span>
+      </article></div>
+      </header>
+      <section id="agent-shift" class="section">
+    <div class="section-head">
+      <p>从会问模型，到会设计 Agent 工作系统</p>
+      <h2>认知转变</h2>
+    </div>
+    <div class="two-col">
+        <div class="card"><h3>普通 Chatbot</h3><ul><li>以语言生成和问答为中心</li><li>上下文通常由用户一次性提供</li><li>回答质量主要依赖提示词和模型知识</li><li>缺少真实执行和验证闭环</li></ul></div>
+        <div class="card"><h3>Agent</h3><ul><li>能观察环境、调用工具、修改状态</li><li>通过执行结果持续修正计划</li><li>需要权限、边界、日志和验证</li><li>更像一个受控工作系统</li></ul></div>
+      </div>
+      <div class="callout" style="margin-top:18px"><strong>关键理解：</strong>学习 Agent 的重点不是背 prompt，而是学会定义目标、提供上下文、设置边界、建立验证和沉淀流程。</div>
+  </section>
+<section id="task-design" class="section">
+    <div class="section-head">
+      <p>高质量任务让 Agent 少猜、多证据、可验收</p>
+      <h2>任务设计</h2>
+    </div>
+    <div class="card-grid"><article class="card">
+        <div class="card-kicker">Goal</div>
+        <h3>目标可观察</h3>
+        <p>不要说“优化一下”，而要说“定位 token 刷新失败根因，并修复对应测试”。</p>
+      </article><article class="card">
+        <div class="card-kicker">Context</div>
+        <h3>上下文具体</h3>
+        <p>提供相关目录、入口、错误输出、调用链、历史决策和本地约束。</p>
+      </article><article class="card">
+        <div class="card-kicker">Scope</div>
+        <h3>范围明确</h3>
+        <p>说明允许改哪里、不改哪里、是否能引入依赖、是否能执行提交或安装。</p>
+      </article><article class="card">
+        <div class="card-kicker">Acceptance</div>
+        <h3>验收清楚</h3>
+        <p>给出测试命令、文件产物、行为变化或文档标准，避免 Agent 自己定义完成。</p>
+      </article><article class="card">
+        <div class="card-kicker">Risk</div>
+        <h3>风险边界</h3>
+        <p>删除、推送、数据库、生产环境、权限放宽等动作必须显式确认。</p>
+      </article><article class="card">
+        <div class="card-kicker">Output</div>
+        <h3>输出形态</h3>
+        <p>明确最终要代码、报告、PR、HTML、表格、脚本还是命令结果摘要。</p>
+      </article></div>
+  </section>
+<section id="learning-layers" class="section">
+    <div class="section-head">
+      <p>从个人提效到设计 Agent runtime</p>
+      <h2>学习四层</h2>
+    </div>
+    <div class="flow"><div class="flow-step">
+        <span>01</span>
+        <strong>会用</strong>
+        <p>把模糊需求转成可执行任务；让 Agent 读代码、计划、执行、验证。</p>
+      </div><div class="flow-step">
+        <span>02</span>
+        <strong>会控</strong>
+        <p>掌握权限模式、沙箱、Git 工作区保护、测试驱动和失败调试。</p>
+      </div><div class="flow-step">
+        <span>03</span>
+        <strong>会组织</strong>
+        <p>使用子代理、任务队列、工作树、技能、MCP、插件和知识库承接复杂任务。</p>
+      </div><div class="flow-step">
+        <span>04</span>
+        <strong>会设计</strong>
+        <p>理解工具 schema、权限仲裁、上下文压缩、消息协议、可观测性和错误恢复。</p>
+      </div></div>
+  </section>
+<section id="knowledge-loop" class="section">
+    <div class="section-head">
+      <p>Agent 不只是消耗知识，也应该生产可复用知识</p>
+      <h2>知识沉淀</h2>
+    </div>
+    <div class="table-wrap"><table>
+    <thead><tr><th>沉淀对象</th><th>保存内容</th><th>适合例子</th><th>避免内容</th></tr></thead>
+    <tbody><tr><td>模板</td><td>成功任务的通用步骤和验收方式</td><td>Bugfix、Review、Release、迁移模板</td><td>只适用于一次任务的细节</td></tr><tr><td>技能</td><td>需要稳定遵守的操作规程</td><td>安全审计、视觉验收、发布前检查</td><td>没有重复价值的长提示词</td></tr><tr><td>项目文档</td><td>架构边界、命令、模块职责、设计决策</td><td>README、AGENTS.md、架构文档</td><td>临时调试输出</td></tr><tr><td>记忆</td><td>长期偏好和协作习惯</td><td>语言偏好、验证要求、提交偏好</td><td>密钥、快速过期事实、源码现状</td></tr></tbody>
+  </table></div>
+  </section>
+<section id="anti-patterns" class="section">
+    <div class="section-head">
+      <p>这些问题会让 Agent 看似努力但产出不可靠</p>
+      <h2>常见反模式</h2>
+    </div>
+    <div class="card-grid"><article class="card">
+        <div class="card-kicker">Context Gap</div>
+        <h3>只给目标不给上下文</h3>
+        <p>模型会猜项目结构。改法：要求先探索入口、调用方和测试。</p>
+      </article><article class="card">
+        <div class="card-kicker">Scope Creep</div>
+        <h3>一次做太多事</h3>
+        <p>上下文膨胀且难验证。改法：按独立验收单元拆任务。</p>
+      </article><article class="card">
+        <div class="card-kicker">No Evidence</div>
+        <h3>不要求验证</h3>
+        <p>代码可能看起来对但不能运行。改法：明确测试命令和完成证据。</p>
+      </article><article class="card">
+        <div class="card-kicker">Overtrust</div>
+        <h3>把模型当事实源</h3>
+        <p>最新 API、价格、政策和文档必须查源，不能凭记忆回答。</p>
+      </article><article class="card">
+        <div class="card-kicker">Overpermission</div>
+        <h3>权限开太大</h3>
+        <p>误删、误推、误改配置风险上升。改法：默认最小权限。</p>
+      </article><article class="card">
+        <div class="card-kicker">Weak Done</div>
+        <h3>让 Agent 自定完成标准</h3>
+        <p>它可能选择最容易完成的解释。改法：先定义验收标准。</p>
+      </article></div>
+  </section>
+<section id="team-adoption" class="section">
+    <div class="section-head">
+      <p>把 Agent 纳入流程，而不是只发给个人自由使用</p>
+      <h2>团队落地</h2>
+    </div>
+    <div class="two-col">
+        <div class="card"><h3>团队资产</h3><ul><li>项目入口文档：启动、测试、目录、禁区</li><li>Agent 工作规范：计划、验证、风险确认</li><li>技能库：review、release、incident、migration</li><li>知识回填：任务结束后更新文档或模板</li></ul></div>
+        <div class="card"><h3>质量机制</h3><ul><li>非 trivial 任务先计划</li><li>bugfix 先复现</li><li>完成前必须运行相关验证</li><li>失败测试不能被绕过或淡化</li><li>新增依赖和 destructive 操作需确认</li></ul></div>
+      </div>
+  </section>
+      <section id="catalog-method" class="section">
+    <div class="section-head">
+      <p>学习方法补充</p>
+      <h2>用目录法学习 Agent 架构</h2>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>层级</th><th>要问的问题</th><th>典型章节</th></tr></thead>
+      <tbody>
+        <tr><td>项目全景</td><td>解决什么问题，用什么技术栈，目录怎么组织？</td><td>项目概览、技术栈、目录结构</td></tr>
+        <tr><td>运行入口</td><td>程序如何启动，如何加载配置和能力？</td><td>启动流程、配置系统、Feature Flag</td></tr>
+        <tr><td>核心循环</td><td>模型如何观察、调用工具、处理结果？</td><td>Agent Loop、工具调用、流式执行</td></tr>
+        <tr><td>状态管理</td><td>长对话、任务、记忆和恢复如何处理？</td><td>Task、Compact、Memory、Session</td></tr>
+        <tr><td>扩展机制</td><td>用户和团队如何扩展能力？</td><td>Skill、Hooks、MCP、Plugins</td></tr>
+        <tr><td>设计评价</td><td>架构亮点、风险和可复用经验是什么？</td><td>关键文件、设计哲学、工程启发</td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout" style="margin-top:18px"><strong>为什么有效：</strong>目录法先建立心智地图，再进入核心循环和扩展机制，能避免一开始陷入单个函数细节，也适合评估不同 Agent 产品的架构成熟度。</div>
+  </section>
+
+<section id="runtime-design" class="section">
+    <div class="section-head">
+      <p>要构建可靠 Agent，模型只是组件之一</p>
+      <h2>自研 Agent 技术栈</h2>
+    </div>
+    <div class="flow"><div class="flow-step">
+        <span>01</span>
+        <strong>消息协议</strong>
+        <p>定义 user、assistant、tool_use、tool_result、progress、attachment、error 和 compact boundary。</p>
+      </div><div class="flow-step">
+        <span>02</span>
+        <strong>工具 ABI</strong>
+        <p>每个工具需要 schema、权限、只读/破坏性声明、结果序列化和 UI 展示。</p>
+      </div><div class="flow-step">
+        <span>03</span>
+        <strong>权限系统</strong>
+        <p>支持 allow/deny/ask、临时/持久授权、headless 自动拒绝、组织策略和 hooks。</p>
+      </div><div class="flow-step">
+        <span>04</span>
+        <strong>执行调度</strong>
+        <p>处理并发安全、中断、超时、取消、失败恢复、结果顺序和后台任务。</p>
+      </div><div class="flow-step">
+        <span>05</span>
+        <strong>上下文管理</strong>
+        <p>处理 token 估算、prompt cache、压缩、恢复附件、结果落盘和 resume。</p>
+      </div><div class="flow-step">
+        <span>06</span>
+        <strong>可观测性</strong>
+        <p>记录模型请求、工具调用、权限决策、错误、token、cost 和验证证据。</p>
+      </div></div>
+  </section>
+<section id="principles" class="section">
+    <div class="section-head">
+      <p>最值得保留下来的 Agent 使用判断</p>
+      <h2>长期原则</h2>
+    </div>
+    <div class="callout"><strong>核心公式：</strong>模型推理能力 + 正确上下文 + 结构化工具 + 权限边界 + 执行反馈 + 验证证据 + 会话记忆 + 知识沉淀 = 可持续使用的智能工作系统。</div>
+      <div style="margin-top:18px"><ul><li>可靠性来自上下文、边界和验证，不来自更长提示词。</li><li>不要让模型猜代码；让它读代码。</li><li>不要让模型声称完成；让它用证据证明完成。</li><li>工具调用能力越强，权限和审计越重要。</li><li>区分项目文档、任务状态、长期偏好和临时上下文。</li><li>好的 Agent 工作流应该能被复用、审查和改进。</li></ul></div>
+  </section>
+      <div class="footer">HTML 页面为独立信息架构设计，不依赖 Markdown-to-HTML 转换；Markdown 文件仍作为原始知识文档保留。</div>
+    </main>
+  </div>
+</body>
+</html>
