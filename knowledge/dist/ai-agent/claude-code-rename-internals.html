@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>知识总览</title>
+  <title>Claude Code /rename 会话改名的底层实现</title>
   <style>
 :root {
   color-scheme: light;
@@ -431,254 +431,184 @@ aside.toc .toc-l3 a {
 <main class="">
 <article>
   <header class="doc-header">
-    <h1>知识总览</h1>
-    <div class="doc-meta"><span class="date">2026-05-19</span>
-        <span class="tag-chip">索引</span>
+    <h1>Claude Code /rename 会话改名的底层实现</h1>
+    <div class="doc-meta"><span class="date">2026-05-26</span>
+        <span class="tag-chip">claude-code</span>
+        <span class="tag-chip">架构</span>
+        <span class="tag-chip">会话</span>
+        <span class="tag-chip">rename</span>
         <span class="status status-complete">complete</span></div>
+    <div class="doc-meta-extra"><dl><dt>适用对象</dt><dd>想理解 Claude Code 会话标题如何生成、存储、检索的人</dd><dt>证据来源</dt><dd>对本机 Claude Code 2.1.150 单文件二进制(/opt/claude-code/bin/claude)的字符串反查 + 本地 ~/.claude/ 会话文件核对</dd><dt>标注约定</dt><dd>函数/变量名来自压缩产物,仅作行为描述,不代表源码真实命名</dd></dl></div>
 
-    <div class="lead">个人技术知识库入口。按主题分类，持续更新。md 是源；运行 <code>scripts/verify.sh</code> 后会构建一份 HTML 镜像到 <code>dist/</code>，作为更友好的阅读视图。</div>
   </header>
   <div class="doc-body">
-<h2 id="学习路径">学习路径<a class="header-anchor" href="#学习路径">#</a></h2>
-<h3 id="想理解-ai-agent-怎么工作">想理解 AI Agent 怎么工作？<a class="header-anchor" href="#想理解-ai-agent-怎么工作">#</a></h3>
+<p>Claude Code 支持给会话起一个<strong>人类可读的标题</strong>,既能在启动时用 <code>--name</code> 指定,也能在会话进行中用 <code>/rename</code> 改名。本文拆解它的底层实现,核心结论先行:<strong><code>/rename</code> 与 <code>--name</code> 最终都落到同一个内部工具 <code>rename_session</code>,把标题以 <code>custom-title</code> 记录持久化进会话 transcript,再驱动 prompt box、<code>/resume</code> 选择器与终端标签页标题</strong>;未命名时由 <code>rename_generate_name</code> 基于首个有意义提问自动生成标题。</p>
+<div class="admonition note"><div class="admonition-title">Note</div>
+<p>常见误解:以为只有 <code>--name</code> 命令行参数、没有斜杠命令。实际上 <code>/rename</code> 是真实存在的会话内命令,二进制里能直接搜到 <code>/rename</code>、<code>/rename &lt;name&gt;</code>、<code>Rename the current conversation</code> 等字符串。两者的区别只是触发时机:<code>--name</code> 在启动时设定,<code>/rename</code> 在会话进行中改名。</p>
+</div>
+<h2 id="两个入口">两个入口<a class="header-anchor" href="#两个入口">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>入口</th>
+<th>形态</th>
+<th>帮助/描述文案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--name &lt;name&gt;</code> / <code>-n</code></td>
+<td>CLI 启动参数</td>
+<td>&quot;Set a display name for this session (shown in the prompt box, /resume picker, and terminal title)&quot;</td>
+</tr>
+<tr>
+<td><code>/rename [name]</code></td>
+<td>会话内斜杠命令</td>
+<td>&quot;Rename the current conversation&quot;</td>
+</tr>
+</tbody>
+</table>
+<p><code>/rename</code> 的引导文案还包括:</p>
+<ul>
+<li>&quot;/rename to add a name&quot;</li>
+<li>&quot;/rename to find them easily in /resume later&quot;</li>
+<li>&quot;/rename to tell them apart at a glance&quot;</li>
+</ul>
+<p>即改名的产品目的是:让会话在 <code>/resume</code> 选择器里<strong>可搜索、可区分</strong>。</p>
+<h2 id="底层工具rename-session">底层工具：rename_session<a class="header-anchor" href="#底层工具rename-session">#</a></h2>
+<p>两个入口最终都调用一个内部工具 <code>rename_session</code>:</p>
+<pre><code>rename_session({ title: string })
+// 描述: &quot;Sets the user-facing title for the current session.&quot;
+// 校验: title.trim() 非空,否则报 &quot;title must be non-empty&quot;
+</code></pre>
+<p>实现要点(均为二进制字符串确证):</p>
 <ol>
-<li><a href="ai-agent/claude-execution-mechanics.html">Claude Code 执行机制全景分析</a> — 从底层理解 Claude Code 的会话、工具、权限、记忆机制</li>
-<li><a href="ai-agent/mcp-fundamentals.html">MCP 全面理解</a> — Agent 与外部系统交互的协议标准</li>
-<li><a href="ai-agent/xiaohongshu-mcp.html">小红书 MCP 架构</a> — MCP 的真实落地案例</li>
+<li><strong>入参 schema</strong>:<code>{ title: y.string() }</code>(zod),处理时先 <code>title.trim()</code>。</li>
+<li><strong>空值校验</strong>:<code>trim</code> 后为空直接拒绝,错误信息 <code>title must be non-empty</code>。</li>
+<li><strong>上下文依赖</strong>:需要 UI 注册了 <code>onRenameSession</code> 回调才能用;否则报错
+<code>rename_session is not supported in this context (onRenameSession callback not registered)</code>。
+——这解释了为什么非交互/某些嵌入场景下无法改名。</li>
 </ol>
-<h3 id="想从-claude-code-迁移到-codex">想从 Claude Code 迁移到 Codex？<a class="header-anchor" href="#想从-claude-code-迁移到-codex">#</a></h3>
-<ol>
-<li><a href="codex/migrate-analysis.html">迁移全面分析</a> — 两个生态的整体对比</li>
-<li><a href="codex/cc-steward-sync.html">CC Steward Sync 对照</a> — 管家模式差异详解</li>
-<li><a href="codex/migrate-official-guide.html">官方迁移思路</a> — Codex 官方建议</li>
-<li><a href="codex/local-sessions-structure.html">本地会话结构</a> — 会话存储层面的差异</li>
-</ol>
-<h3 id="想搞定网络代理问题">想搞定网络代理问题？<a class="header-anchor" href="#想搞定网络代理问题">#</a></h3>
-<ol>
-<li><a href="networking/proxy-basics/index.html">代理网络基础</a> — 从零理解代理、机场、节点</li>
-<li><a href="networking/v2ray-proxy-shell-switch.html">终端代理切换</a> — Shell 环境变量与代理的关系</li>
-<li><a href="incidents/v2rayn-oauth-2026-04-11.html">V2RayN OAuth 事件复盘</a> — 代理导致 OAuth 失败的真实案例</li>
-</ol>
-<h2 id="按主题浏览">按主题浏览<a class="header-anchor" href="#按主题浏览">#</a></h2>
-<h3 id="ai-agent">AI Agent<a class="header-anchor" href="#ai-agent">#</a></h3>
+<div class="admonition tip"><div class="admonition-title">Tip</div>
+<p><code>rename_session</code> 是工具化的,意味着模型自身也能在合适时机发起改名(例如对话主题切换后),而不只是用户手动敲 <code>/rename</code>。</p>
+</div>
+<h2 id="自动命名rename-generate-name">自动命名：rename_generate_name<a class="header-anchor" href="#自动命名rename-generate-name">#</a></h2>
+<p>未显式命名时,标题由自动生成器产出,标记为 <code>querySource: &quot;rename_generate_name&quot;</code>:</p>
+<ul>
+<li>生成一个&quot;topic title&quot;(主题式标题)。</li>
+<li>取材:<code>First meaningful user prompt in the session</code>(会话中<strong>首个有意义的用户提问</strong>),并结合 Git 信息(如分支)。</li>
+<li><code>/rename</code> 或 <code>--name</code> 的作用就是用用户输入<strong>覆盖</strong>这个自动标题。</li>
+</ul>
+<h2 id="持久化">持久化<a class="header-anchor" href="#持久化">#</a></h2>
+<p>标题落盘在会话 transcript(JSONL)里,与 Stats 用的是同一套存储:</p>
+<pre><code>~/.claude/projects/&lt;编码后的项目路径&gt;/&lt;sessionId&gt;.jsonl
+</code></pre>
+<p>标题记录格式(实测,通常位于文件首行):</p>
+<pre><code class="language-json">{ &quot;type&quot;: &quot;custom-title&quot;, &quot;customTitle&quot;: &quot;&lt;用户提供的名字&gt;&quot;, &quot;sessionId&quot;: &quot;&lt;uuid&gt;&quot; }
+</code></pre>
+<p>相关函数/字段符号:</p>
 <table>
 <thead>
 <tr>
-<th>文档</th>
-<th>日期</th>
-<th>标签</th>
+<th>符号</th>
+<th>行为</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><a href="ai-agent/claude-execution-mechanics.html">Claude Code 执行机制</a></td>
-<td>2026-04-18</td>
-<td><code>claude-code</code> <code>架构</code></td>
+<td><code>custom-title</code> / <code>customTitle</code></td>
+<td>transcript 中的标题记录类型与字段</td>
 </tr>
 <tr>
-<td><a href="ai-agent/claude-code-stats-internals.html">Claude Code Stats 本地实现</a></td>
-<td>2026-05-26</td>
-<td><code>claude-code</code> <code>架构</code></td>
+<td><code>saveCustomTitle</code></td>
+<td>写入/更新标题记录</td>
 </tr>
 <tr>
-<td><a href="ai-agent/claude-code-rename-internals.html">Claude Code /rename 实现</a></td>
-<td>2026-05-26</td>
-<td><code>claude-code</code> <code>架构</code></td>
+<td><code>searchSessionsByCustomTitle</code></td>
+<td><code>/resume</code> 选择器按标题搜索</td>
 </tr>
 <tr>
-<td><a href="ai-agent/mcp-fundamentals.html">MCP 全面理解</a></td>
-<td>2026-04-16</td>
-<td><code>mcp</code> <code>协议</code></td>
+<td><code>isCustomTitleEnabled</code></td>
+<td>标题特性开关判定</td>
 </tr>
 <tr>
-<td><a href="ai-agent/xiaohongshu-mcp.html">小红书 MCP 架构</a></td>
-<td>2026-04-16</td>
-<td><code>mcp</code> <code>架构</code></td>
-</tr>
-<tr>
-<td><a href="ai-agent/tw93-agent.html">Tw93 Agent 实践</a></td>
-<td>2026-03-21</td>
-<td><code>agent</code> <code>阅读笔记</code></td>
-</tr>
-<tr>
-<td><a href="ai-agent/tw93-claude.html">Tw93 Claude 经验</a></td>
-<td>2026-03-12</td>
-<td><code>claude-code</code> <code>阅读笔记</code></td>
+<td><code>customTitles</code></td>
+<td>标题集合(批量读取)</td>
 </tr>
 </tbody>
 </table>
-<h3 id="codex">Codex<a class="header-anchor" href="#codex">#</a></h3>
+<h2 id="配置开关terminaltitlefromrename">配置开关：terminalTitleFromRename<a class="header-anchor" href="#配置开关terminaltitlefromrename">#</a></h2>
+<p>一个布尔配置控制改名是否同步到终端标签页标题:</p>
+<ul>
+<li><code>terminalTitleFromRename</code>(<strong>默认 <code>true</code></strong>):<code>/rename</code> 会更新终端标签页标题。</li>
+<li>设为 <code>false</code>:保留<strong>自动生成的 topic title</strong>,不让手动改名覆盖终端标题。</li>
+</ul>
+<p>文案原文:&quot;<code>/rename</code> updates the terminal tab title (defaults to true). Set to false to keep auto-generated topic titles.&quot;</p>
+<h2 id="边界与遥测">边界与遥测<a class="header-anchor" href="#边界与遥测">#</a></h2>
+<p><strong>Swarm 协作场景</strong>会拒绝改名:</p>
+<pre><code>Cannot rename: This session is a swarm teammate. Teammate names are set by the team leader.
+</code></pre>
+<p>即作为团队队友(teammate)的会话,名字由 leader 统一指派,不可自行改名。</p>
+<p><strong>遥测事件</strong>(<code>tengu_*</code>):</p>
 <table>
 <thead>
 <tr>
-<th>文档</th>
-<th>日期</th>
-<th>标签</th>
+<th>事件</th>
+<th>触发时机</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><a href="codex/migrate-analysis.html">迁移全面分析</a></td>
-<td>2026-05-12</td>
-<td><code>codex</code> <code>迁移</code></td>
+<td><code>tengu_session_rename_started</code></td>
+<td>发起改名</td>
 </tr>
 <tr>
-<td><a href="codex/cc-steward-sync.html">CC Steward Sync 对照</a></td>
-<td>2026-05-15</td>
-<td><code>codex</code> <code>迁移</code></td>
+<td><code>tengu_session_renamed</code></td>
+<td>改名完成</td>
 </tr>
 <tr>
-<td><a href="codex/migrate-official-guide.html">官方迁移思路</a></td>
-<td>2026-05-15</td>
-<td><code>codex</code> <code>迁移</code></td>
-</tr>
-<tr>
-<td><a href="codex/local-sessions-structure.html">本地会话结构</a></td>
-<td>2026-05-16</td>
-<td><code>codex</code> <code>会话</code></td>
+<td><code>tengu_rename_full_session_fork</code></td>
+<td>改名涉及 fork 整段会话时</td>
 </tr>
 </tbody>
 </table>
-<h3 id="网络与代理">网络与代理<a class="header-anchor" href="#网络与代理">#</a></h3>
-<table>
-<thead>
-<tr>
-<th>文档</th>
-<th>日期</th>
-<th>标签</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="networking/proxy-basics/index.html">代理网络基础</a></td>
-<td>2026-05-16</td>
-<td><code>代理</code> <code>网络</code></td>
-</tr>
-<tr>
-<td><a href="networking/v2ray-proxy-shell-switch.html">V2Ray Shell 切换</a></td>
-<td>2026-04-18</td>
-<td><code>v2ray</code> <code>终端</code></td>
-</tr>
-</tbody>
-</table>
-<h3 id="事故复盘">事故复盘<a class="header-anchor" href="#事故复盘">#</a></h3>
-<table>
-<thead>
-<tr>
-<th>文档</th>
-<th>日期</th>
-<th>标签</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="incidents/v2rayn-oauth-2026-04-11.html">V2RayN OAuth 事件</a></td>
-<td>2026-04-11</td>
-<td><code>v2ray</code> <code>oauth</code> <code>故障复盘</code></td>
-</tr>
-</tbody>
-</table>
-<h2 id="标签索引">标签索引<a class="header-anchor" href="#标签索引">#</a></h2>
-<table>
-<thead>
-<tr>
-<th>标签</th>
-<th>相关文档数</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>claude-code</code></td>
-<td>6</td>
-</tr>
-<tr>
-<td><code>mcp</code></td>
-<td>2</td>
-</tr>
-<tr>
-<td><code>agent</code></td>
-<td>3</td>
-</tr>
-<tr>
-<td><code>codex</code></td>
-<td>4</td>
-</tr>
-<tr>
-<td><code>迁移</code></td>
-<td>3</td>
-</tr>
-<tr>
-<td><code>v2ray</code></td>
-<td>3</td>
-</tr>
-<tr>
-<td><code>代理</code></td>
-<td>2</td>
-</tr>
-<tr>
-<td><code>阅读笔记</code></td>
-<td>2</td>
-</tr>
-<tr>
-<td><code>故障复盘</code></td>
-<td>1</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="目录结构约定">目录结构约定<a class="header-anchor" href="#目录结构约定">#</a></h2>
-<table>
-<thead>
-<tr>
-<th>路径</th>
-<th>角色</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>README.md</code></td>
-<td>知识库入口（本文件），承担总览 + 学习路径 + 主题表格</td>
-</tr>
-<tr>
-<td><code>_meta/template.md</code></td>
-<td>新文档骨架，供作者复制使用</td>
-</tr>
-<tr>
-<td><code>&lt;topic&gt;/&lt;doc&gt;.md</code></td>
-<td>单文件主题，最常见形态</td>
-</tr>
-<tr>
-<td><code>&lt;topic&gt;/&lt;doc&gt;/README.md</code> + <code>&lt;doc&gt;/assets/</code></td>
-<td>目录形态主题，当一篇笔记需要 ≥1 附件（图、附文）时升级</td>
-</tr>
-<tr>
-<td><code>incidents/</code></td>
-<td>事故复盘；累计 ≥3 篇时按 <code>incidents/YYYY/MM-DD-slug.md</code> 重组</td>
-</tr>
-<tr>
-<td><code>dist/</code></td>
-<td>由 <code>scripts/build-html.py</code> 生成的 HTML 镜像，不要手改</td>
-</tr>
-</tbody>
-</table>
-<p>新增笔记的步骤：复制 <a href="_meta/template.html">_meta/template.md</a> → 改 frontmatter → 写正文 → 在本文件对应分类表格里加一行 → 运行 <code>scripts/verify.sh</code> 重建 HTML。</p>
+<h2 id="数据流总览">数据流总览<a class="header-anchor" href="#数据流总览">#</a></h2>
+<pre><code>用户敲 /rename foo   ──┐
+启动加 --name foo    ──┤──▶ rename_session({title:&quot;foo&quot;})
+模型自动改名          ──┘            │ trim + 非空校验
+                                     ▼
+                          saveCustomTitle 写入 transcript
+                          {type:&quot;custom-title&quot;, customTitle:&quot;foo&quot;, sessionId}
+                                     │
+              ┌──────────────────────┼───────────────────────┐
+              ▼                      ▼                        ▼
+        prompt box 显示      /resume 选择器               终端标签页标题
+                       (searchSessionsByCustomTitle)  (受 terminalTitleFromRename 控制)
+
+未命名 ──▶ rename_generate_name 基于&quot;首个有意义提问&quot;+Git 生成 topic title
+</code></pre>
+<h2 id="总结">总结<a class="header-anchor" href="#总结">#</a></h2>
+<ul>
+<li><code>/rename</code>(会话内)与 <code>--name</code>(启动时)是同一能力的两个入口,底层统一走内部工具 <code>rename_session</code>,入参 <code>title</code>,空值即拒。</li>
+<li>标题以 <code>custom-title</code> 记录持久化进 <code>~/.claude/projects/**/&lt;sessionId&gt;.jsonl</code>,与 Stats 共用同一套本地 transcript 存储。</li>
+<li>标题影响三处展示:prompt box、<code>/resume</code> 选择器(可搜索)、终端标签页标题(后者受 <code>terminalTitleFromRename</code> 开关控制)。</li>
+<li>未命名时由 <code>rename_generate_name</code> 基于首个有意义提问 + Git 信息自动生成主题标题;手动改名只是覆盖它。</li>
+<li>边界:swarm 队友会话不可自行改名;非交互上下文因缺少 <code>onRenameSession</code> 回调而不支持。</li>
+</ul>
   </div>
   <footer class="doc-footer">
-    <div>源文件：<code>knowledge/README.md</code></div>
+    <div>源文件：<code>knowledge/ai-agent/claude-code-rename-internals.md</code></div>
     <div>生成于：2026-05-26 03:51</div>
   </footer>
 </article>
-<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#学习路径">学习路径</a></li>
-<li class="toc-l3"><a href="#想理解-ai-agent-怎么工作">想理解 AI Agent 怎么工作？</a></li>
-<li class="toc-l3"><a href="#想从-claude-code-迁移到-codex">想从 Claude Code 迁移到 Codex？</a></li>
-<li class="toc-l3"><a href="#想搞定网络代理问题">想搞定网络代理问题？</a></li>
-<li class="toc-l2"><a href="#按主题浏览">按主题浏览</a></li>
-<li class="toc-l3"><a href="#ai-agent">AI Agent</a></li>
-<li class="toc-l3"><a href="#codex">Codex</a></li>
-<li class="toc-l3"><a href="#网络与代理">网络与代理</a></li>
-<li class="toc-l3"><a href="#事故复盘">事故复盘</a></li>
-<li class="toc-l2"><a href="#标签索引">标签索引</a></li>
-<li class="toc-l2"><a href="#目录结构约定">目录结构约定</a></li></ol></div></details></aside>
+<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#两个入口">两个入口</a></li>
+<li class="toc-l2"><a href="#底层工具rename-session">底层工具：rename_session</a></li>
+<li class="toc-l2"><a href="#自动命名rename-generate-name">自动命名：rename_generate_name</a></li>
+<li class="toc-l2"><a href="#持久化">持久化</a></li>
+<li class="toc-l2"><a href="#配置开关terminaltitlefromrename">配置开关：terminalTitleFromRename</a></li>
+<li class="toc-l2"><a href="#边界与遥测">边界与遥测</a></li>
+<li class="toc-l2"><a href="#数据流总览">数据流总览</a></li>
+<li class="toc-l2"><a href="#总结">总结</a></li></ol></div></details></aside>
 </main>
 <script>
 (function () {
