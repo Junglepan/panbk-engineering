@@ -37,6 +37,7 @@ status: complete
 | 文档 | 日期 | 标签 |
 |------|------|------|
 | [Claude Code 执行机制](ai-agent/claude-execution-mechanics.md) | 2026-04-18 | `claude-code` `架构` |
+| [Claude Code Stats 本地实现](ai-agent/claude-code-stats-internals.md) | 2026-05-26 | `claude-code` `架构` |
 | [MCP 全面理解](ai-agent/mcp-fundamentals.md) | 2026-04-16 | `mcp` `协议` |
 | [小红书 MCP 架构](ai-agent/xiaohongshu-mcp.md) | 2026-04-16 | `mcp` `架构` |
 | [Tw93 Agent 实践](ai-agent/tw93-agent.md) | 2026-03-21 | `agent` `阅读笔记` |

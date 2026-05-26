@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude Code Stats 标签页的本地实现原理</title>
+  <style>
+:root {
+  color-scheme: light;
+  --bg: #f7f8fb;
+  --paper: #ffffff;
+  --text: #1f2937;
+  --text-strong: #111827;
+  --muted: #667085;
+  --line: #d9dee8;
+  --accent: #0f766e;
+  --accent-soft: #eef6f5;
+  --accent-deep: #134e4a;
+  --warn: #7c2d12;
+  --code-bg: #f1f5f9;
+  --code-block-bg: #0f172a;
+  --code-block-fg: #e5e7eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 16px;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.68;
+}
+
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 32px;
+  align-items: start;
+}
+
+main.no-toc {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1000px;
+}
+
+article {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 42px 48px;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.05);
+  min-width: 0;
+}
+
+/* Header block */
+.doc-header h1 {
+  margin: 0 0 12px;
+  font-size: 32px;
+  line-height: 1.25;
+  color: var(--text-strong);
+}
+
+.doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.doc-meta .date {
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-meta .sep {
+  color: var(--line);
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.status {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.status-complete { background: #dcfce7; color: #166534; }
+.status-wip      { background: #fef3c7; color: #92400e; }
+.status-draft    { background: #e5e7eb; color: #4b5563; }
+
+.doc-meta-extra {
+  background: var(--accent-soft);
+  border: 1px solid #d6e9e7;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 20px;
+  color: var(--accent-deep);
+  font-size: 14px;
+}
+.doc-meta-extra dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.doc-meta-extra dt {
+  font-weight: 500;
+}
+.doc-meta-extra dd {
+  margin: 0;
+}
+
+.lead {
+  font-size: 17px;
+  color: #243041;
+  border-left: 4px solid var(--accent);
+  padding: 4px 0 4px 14px;
+  margin: 16px 0 28px;
+}
+
+/* Headings inside body */
+.doc-body h2 {
+  margin: 38px 0 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 23px;
+  line-height: 1.3;
+  color: var(--text-strong);
+  scroll-margin-top: 16px;
+}
+.doc-body h3 {
+  margin: 26px 0 10px;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--accent-deep);
+  scroll-margin-top: 16px;
+}
+.doc-body h4 {
+  margin: 20px 0 8px;
+  font-size: 16px;
+  color: var(--text-strong);
+}
+
+.doc-body h2 .header-anchor,
+.doc-body h3 .header-anchor,
+.doc-body h4 .header-anchor {
+  margin-left: 8px;
+  color: var(--line);
+  text-decoration: none;
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.doc-body h2:hover .header-anchor,
+.doc-body h3:hover .header-anchor,
+.doc-body h4:hover .header-anchor {
+  opacity: 1;
+}
+
+/* Text content */
+.doc-body p { margin: 10px 0; }
+.doc-body ul, .doc-body ol { margin: 8px 0 16px 24px; padding: 0; }
+.doc-body li { margin: 4px 0; }
+.doc-body li > p { margin: 4px 0; }
+
+.doc-body blockquote {
+  border-left: 4px solid var(--line);
+  padding: 4px 0 4px 14px;
+  margin: 14px 0;
+  color: var(--muted);
+}
+
+.doc-body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 24px 0;
+}
+
+/* Inline code & code blocks */
+.doc-body code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.code-wrap {
+  position: relative;
+  margin: 14px 0;
+}
+.code-wrap pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--code-block-bg);
+  color: var(--code-block-fg);
+  line-height: 1.5;
+  font-size: 13.5px;
+}
+.code-wrap pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.code-wrap:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.copy-btn.copied { color: #86efac; }
+
+/* Tables */
+.doc-body table {
+  width: 100%;
+  margin: 14px 0 22px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.doc-body th, .doc-body td {
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  vertical-align: top;
+  text-align: left;
+}
+.doc-body th {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 500;
+}
+
+/* Admonitions (GitHub-style) */
+.admonition {
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 18px 0;
+  border: 1px solid;
+  background: #fff;
+}
+.admonition-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+.admonition-title::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.admonition > p:last-child { margin-bottom: 0; }
+.admonition > p:first-of-type { margin-top: 0; }
+
+.admonition.note      { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.admonition.tip       { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.admonition.important { background: #f5f3ff; border-color: #ddd6fe; color: #5b21b6; }
+.admonition.warning   { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.admonition.caution   { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+.admonition > p { color: var(--text); }
+
+/* Images */
+.doc-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+/* Links */
+.doc-body a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+.doc-body a:hover {
+  border-bottom-color: var(--accent);
+}
+
+/* TOC sidebar */
+aside.toc {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 16px 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+aside.toc .toc-title {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+aside.toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+aside.toc li { margin: 4px 0; }
+aside.toc a {
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border-left: 2px solid transparent;
+  line-height: 1.45;
+}
+aside.toc a:hover {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+aside.toc .toc-l3 a {
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Footer */
+.doc-footer {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.doc-footer code {
+  background: var(--code-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Narrow screens */
+@media (max-width: 980px) {
+  main {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px 12px 40px;
+  }
+  article {
+    padding: 24px 18px;
+  }
+  .doc-header h1 { font-size: 26px; }
+  .doc-body h2 { font-size: 20px; }
+  .doc-body table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  aside.toc {
+    position: static;
+    max-height: none;
+    order: -1;
+  }
+  aside.toc.collapsible {
+    padding: 0;
+  }
+  aside.toc.collapsible summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    list-style: none;
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  aside.toc.collapsible .toc-body {
+    padding: 0 16px 14px;
+  }
+  aside.toc.collapsible .toc-title { display: none; }
+}
+
+  </style>
+</head>
+<body>
+<main class="">
+<article>
+  <header class="doc-header">
+    <h1>Claude Code Stats 标签页的本地实现原理</h1>
+    <div class="doc-meta"><span class="date">2026-05-26</span>
+        <span class="tag-chip">claude-code</span>
+        <span class="tag-chip">架构</span>
+        <span class="tag-chip">stats</span>
+        <span class="tag-chip">本地优先</span>
+        <span class="status status-complete">complete</span></div>
+    <div class="doc-meta-extra"><dl><dt>适用对象</dt><dd>想理解 Claude Code 数据分层、或想离线复刻一份用量看板的人</dd><dt>证据来源</dt><dd>对本机 @anthropic-ai/claude-code@2.1.42 的 cli.js 反查 + 本地 ~/.claude/ 文件结构核对</dd><dt>标注约定</dt><dd>函数/变量名来自压缩产物,仅作行为描述,不代表源码真实命名</dd></dl></div>
+    <div class="lead">Claude Code 的 Stats 标签页(<code>/usage</code> 面板里的 Stats 子页)展示会话热力图、token 总量、连击天数等行为统计。本文逐指标拆解其底层实现,核心结论先行:<strong>整张 Stats 面板 100% 由本地会话 transcript 计算得出,不调用任何服务端接口</strong>,与隔壁服务端权威的 Usage 标签形成鲜明对照。</div>
+  </header>
+  <div class="doc-body">
+<h2 id="背景stats-在产品里的位置">背景：Stats 在产品里的位置<a class="header-anchor" href="#背景stats-在产品里的位置">#</a></h2>
+<p>顶部标签栏为 <code>Settings · Status · Config · Usage · Stats</code>,Stats 下有 <code>Overview</code> 与 <code>Models</code> 两个子页。Overview 呈现:</p>
+<ul>
+<li>GitHub 式贡献热力图(周一/三/五行 × 月份列,<code>Less … More</code> 分桶)</li>
+<li>时间范围切换:<code>All time · Last 7 days · Last 30 days</code>(按 <code>r</code> 循环)</li>
+<li>汇总卡:Favorite model、Total tokens、Sessions、Active days、Most active day、Longest session、Longest streak、Current streak</li>
+<li>一句趣味对比(如 &quot;longest session ~366x longer than a World Cup soccer match&quot;)</li>
+<li>交互:<code>r</code> 切时间范围、<code>ctrl+s</code> 复制</li>
+</ul>
+<div class="admonition note"><div class="admonition-title">Note</div>
+<p>Stats 与 Usage 是两类不同的数据。Stats = 你本地记录的<strong>历史行为分析</strong>;Usage = 服务端权威的<strong>账户配额利用率</strong>(5h/周滚动窗口)。前者全本地,后者全服务端,两者没有重叠地带。</p>
+</div>
+<h2 id="数据存储层">数据存储层<a class="header-anchor" href="#数据存储层">#</a></h2>
+<p>所有原料是 Claude Code 写在磁盘上的会话 transcript:</p>
+<pre><code>~/.claude/projects/&lt;编码后的项目路径&gt;/&lt;sessionId&gt;.jsonl   # 每行一条消息记录
+~/.claude/history.jsonl                                  # 命令历史
+~/.claude/stats-cache.json                               # 聚合结果缓存(cache version = 2)
+</code></pre>
+<p>每个 <code>.jsonl</code> 文件对应一个会话,文件名即 <code>sessionId</code>。每行是一条 JSON 记录,实测字段:</p>
+<pre><code>cwd, entrypoint, gitBranch, isSidechain, message, parentUuid,
+permissionMode, promptId, sessionId, timestamp, type, userType, uuid, version
+</code></pre>
+<p>统计真正依赖的关键字段:</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>timestamp</code></td>
+<td>活跃天、连击、最长会话、热力图、时间范围过滤</td>
+</tr>
+<tr>
+<td><code>sessionId</code>(= 文件名)</td>
+<td>会话计数、按会话分组算时长</td>
+</tr>
+<tr>
+<td><code>message.model</code></td>
+<td>Favorite model、按模型分账</td>
+</tr>
+<tr>
+<td><code>message.usage</code></td>
+<td>token 累加:<code>input_tokens</code> / <code>output_tokens</code> / <code>cache_creation_input_tokens</code> / <code>cache_read_input_tokens</code></td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>区分消息类型,过滤无效行</td>
+</tr>
+</tbody>
+</table>
+<h2 id="聚合管线">聚合管线<a class="header-anchor" href="#聚合管线">#</a></h2>
+<p>核心是一个聚合函数(压缩符号 <code>of1(files, opts)</code>),输入是一批 session 文件路径,输出一个统计对象:</p>
+<pre><code>{ totalSessions, totalMessages, totalDays, activeDays,
+  streaks, dailyActivity, dailyModelTokens, longestSession,
+  modelUsage, firstSession… }
+</code></pre>
+<p>实现要点(均为代码确证):</p>
+<ol>
+<li><strong>分批并发读取</strong>:文件按每批 20 个(<code>M=20</code>)切片,<code>Promise.all</code> 并发解析,避免一次性打开过多文件。</li>
+<li><strong>基于 mtime 的跳读优化</strong>:若指定了 <code>fromDate</code>,先 <code>stat(file)</code> 取 <code>mtime</code>,文件修改时间早于范围起点则直接 <code>skipped</code>,不读内容。这让 <code>Last 7 days</code> 这类查询不必解析全部历史文件。</li>
+<li><strong>逐行解析与校验</strong>:对每行用谓词(<code>rI</code>)判断是否有效记录,无效行丢弃;读失败的文件记日志后跳过,不让单个坏文件拖垮整体。</li>
+<li><strong>缓存</strong>:结果写入 <code>stats-cache.json</code>,带版本号(<code>= 2</code>),版本不匹配(<code>version !== …</code>)即失效重算;配合文件 <code>mtimeMs</code> 判断增量。</li>
+</ol>
+<div class="admonition tip"><div class="admonition-title">Tip</div>
+<p>这套&quot;扫本地文件 + mtime 跳读 + 版本化缓存&quot;的设计,正是它能瞬时切换 All time / Last 7/30 days 且离线可用的原因。</p>
+</div>
+<h2 id="逐指标拆解">逐指标拆解<a class="header-anchor" href="#逐指标拆解">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>底层算法</th>
+<th>本地可算</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>热力图</strong></td>
+<td><code>dailyActivity</code>:按 <code>timestamp</code> 的日期聚合活跃量,渲染成日历网格,<code>Less…More</code> 为强度分桶</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><strong>Favorite model</strong></td>
+<td><code>modelUsage</code>:按 <code>message.model</code> 计数/计 token,取 argmax</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><strong>Total tokens</strong></td>
+<td>累加每条记录 <code>usage</code> 的 input+output+cache 各项</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><strong>Sessions</strong></td>
+<td><code>totalSessions</code>:distinct <code>sessionId</code>(即 <code>.jsonl</code> 文件数)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><strong>Active days</strong></td>
+<td><code>activeDays = Set(活跃日期).size</code>;分母 <code>totalDays = ceil((末时间戳 − 首时间戳) / 86400000) + 1</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td><strong>Most active day</strong></td>
+<td><code>dailyActivity</code> 取活跃量最大的日期</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><strong>Longest session</strong></td>
+<td>同一 <code>sessionId</code> 内 <code>max(timestamp) − min(timestamp)</code> 的最大值</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><strong>Longest / Current streak</strong></td>
+<td>连击函数扫连续活跃日期,返回 <code>{currentStreak, longestStreak, currentStreakStart, longestStreakStart, longestStreakEnd}</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td><strong>All time / Last 7/30 days</strong></td>
+<td>对同一批本地记录做日期区间过滤(配合 mtime 跳读)</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><strong>趣味对比</strong></td>
+<td>见下节,纯展示层</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning"><div class="admonition-title">Warning</div>
+<p><code>Longest session: 22d 21h 15m</code> 这类超长值是按会话首末时间戳之差算的,代表会话被长期挂起/空置,<strong>不是真实在线交互时长</strong>。同理 token 数是当初 API 响应回填进 transcript 的历史值,不是实时重算。</p>
+</div>
+<h2 id="趣味对比的实现">趣味对比的实现<a class="header-anchor" href="#趣味对比的实现">#</a></h2>
+<p>末尾那句&quot;比 X 长/短多少倍&quot;是一张<strong>硬编码的对照表</strong>,用 <code>longestSession</code> 的分钟数去匹配:</p>
+<pre><code>a TED talk            18min     an episode of The Office   22min
+listening to Abbey Road 47min   a yoga class               60min
+a World Cup soccer match 90min  a half marathon           120min
+the movie Inception  148min     watching Titanic          195min
+a transatlantic flight 420min   a full night of sleep     480min
+</code></pre>
+<p>纯本地、纯展示,无任何外部依赖。</p>
+<h2 id="本地-vs-服务端边界">本地 vs 服务端边界<a class="header-anchor" href="#本地-vs-服务端边界">#</a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Stats 标签</th>
+<th>Usage 标签</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>数据源</td>
+<td>本地 <code>~/.claude/projects/**/*.jsonl</code></td>
+<td>服务端 <code>GET /api/oauth/usage</code> + <code>anthropic-ratelimit-unified-*</code> 响应头</td>
+</tr>
+<tr>
+<td>缓存</td>
+<td><code>stats-cache.json</code>(磁盘)</td>
+<td>无磁盘缓存,仅内存</td>
+</tr>
+<tr>
+<td>离线</td>
+<td>可用</td>
+<td>不可用</td>
+</tr>
+<tr>
+<td>口径</td>
+<td>本机所有会话的历史行为</td>
+<td>账户跨所有设备的滚动配额</td>
+</tr>
+</tbody>
+</table>
+<p>本地 transcript 只记录<strong>这台机器的消耗</strong>,看不到手机/网页端/其他项目的用量,也不知道服务端的窗口边界与重置点——这就是 Usage 必须走服务端、而 Stats 能全本地的根本原因。</p>
+<h2 id="可复刻性">可复刻性<a class="header-anchor" href="#可复刻性">#</a></h2>
+<p>Stats 的全部指标都能离线重建,只要解析 <code>~/.claude/projects/**/*.jsonl</code>:</p>
+<ul>
+<li>按 <code>sessionId</code> 分组 → 会话数、最长会话</li>
+<li>按 <code>timestamp</code> 日期去重 → 活跃天、连击、热力图</li>
+<li>累加 <code>message.usage</code> → token 总量、按模型分账</li>
+<li>按 <code>message.model</code> 计数 → Favorite model</li>
+</ul>
+<p>注意需复刻聚合器的两个工程细节才能高效:<strong>mtime 跳读</strong>(避免全量解析)与<strong>版本化缓存</strong>。</p>
+<h2 id="总结">总结<a class="header-anchor" href="#总结">#</a></h2>
+<ul>
+<li>Stats 标签页是一个**本地优先(local-first)**的分析视图:原料是已落盘的会话 transcript,经分批解析 + 版本化缓存聚合而成,完全不依赖服务端。</li>
+<li>逐指标看,热力图、token、会话数、活跃天、连击、最长会话、Favorite model、趣味对比<strong>无一例外可纯本地计算</strong>。</li>
+<li>它与服务端权威的 Usage 标签构成清晰分层:历史行为分析归本地,实时配额状态归服务端。</li>
+<li>据此可以用本仓库的 md→html 流水线,自建一份离线用量看板。</li>
+</ul>
+  </div>
+  <footer class="doc-footer">
+    <div>源文件：<code>knowledge/ai-agent/claude-code-stats-internals.md</code></div>
+    <div>生成于：2026-05-26 02:57</div>
+  </footer>
+</article>
+<aside class="toc collapsible"><details open><summary>目录</summary><div class="toc-body"><div class="toc-title">目录</div><ol><li class="toc-l2"><a href="#背景stats-在产品里的位置">背景：Stats 在产品里的位置</a></li>
+<li class="toc-l2"><a href="#数据存储层">数据存储层</a></li>
+<li class="toc-l2"><a href="#聚合管线">聚合管线</a></li>
+<li class="toc-l2"><a href="#逐指标拆解">逐指标拆解</a></li>
+<li class="toc-l2"><a href="#趣味对比的实现">趣味对比的实现</a></li>
+<li class="toc-l2"><a href="#本地-vs-服务端边界">本地 vs 服务端边界</a></li>
+<li class="toc-l2"><a href="#可复刻性">可复刻性</a></li>
+<li class="toc-l2"><a href="#总结">总结</a></li></ol></div></details></aside>
+</main>
+<script>
+(function () {
+  document.querySelectorAll('pre > code').forEach(function (codeEl) {
+    var pre = codeEl.parentElement;
+    if (!pre || pre.parentElement.classList.contains('code-wrap')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'code-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.type = 'button';
+    btn.textContent = '复制';
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(codeEl.innerText).then(function () {
+        btn.textContent = '已复制';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          btn.textContent = '复制';
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    });
+    wrap.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>
