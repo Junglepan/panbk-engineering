@@ -74,7 +74,7 @@ status: complete
 
 | 标签 | 相关文档数 |
 |------|-----------|
-| `claude-code` | 6 |
+| `claude-code` | 7 |
 | `mcp` | 2 |
 | `agent` | 5 |
 | `codex` | 4 |
